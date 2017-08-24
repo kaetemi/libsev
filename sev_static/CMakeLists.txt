@@ -1,0 +1,17 @@
+
+FILE(GLOB SRCS ../sev/*.cpp)
+FILE(GLOB HDRS ../sev/*.h)
+FILE(GLOB INLS ../sev/*.inl)
+
+SOURCE_GROUP("" FILES ${SRCS} ${HDRS} ${INLS})
+
+ADD_LIBRARY(sev_static
+	${SRCS}
+	${HDRS}
+	${INLS}
+)
+
+TARGET_LINK_LIBRARIES(sev_static
+)
+
+ADD_DEFINITIONS(-DSEV_LIB_STATIC)
