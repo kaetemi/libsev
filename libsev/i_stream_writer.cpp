@@ -27,6 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "i_stream_writer.h"
+#ifdef SEV_MODULE_STREAM_READER_WRITER
 
 namespace sev {
 
@@ -73,5 +74,7 @@ void IStreamWriter::writeString(const std::string &v)
 }
 
 } /* namespace sev */
+
+#endif /* #ifdef SEV_MODULE_STREAM_READER_WRITER */
 
 /* end of file */

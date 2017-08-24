@@ -29,6 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_I_STREAM_WRITER_H
 #define SEV_I_STREAM_WRITER_H
 
+#include "config.h"
+#ifdef SEV_MODULE_STREAM_READER_WRITER
+
 #include <utility>
 #include <string>
 #include <vector>
@@ -40,7 +43,7 @@ namespace sev {
 #define SEV_STREAM_WRITER_BUFFER_DEFAULT (16 * 1024)
 
 //! Stream writer
-class IStreamWriter
+class SEV_LIB IStreamWriter
 {
 public:
 	IStreamWriter(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_WRITER_BUFFER_DEFAULT);
@@ -48,7 +51,7 @@ public:
 	IStreamWriter(std::shared_ptr<char> buffer, size_t index, size_t length);
 	virtual ~IStreamWriter();
 	
-private:
+protected:
 	EventFiber *m_EventFiber;
 	IStream *m_Stream;
 	std::unique_ptr<char> m_UniqueBuffer;
@@ -161,6 +164,8 @@ private:
 } /* namespace sev */
 
 #include "i_stream_writer.inl"
+
+#endif /* #ifdef SEV_MODULE_STREAM_READER_WRITER */
 
 #endif /* #ifndef SEV_I_STREAM_WRITER_H */
 
