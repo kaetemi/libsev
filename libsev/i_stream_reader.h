@@ -33,6 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <vector>
 
+#include "event_loop.h"
+
 namespace sev {
 
 #define SEV_STREAM_READER_BUFFER_DEFAULT (16 * 1024)
@@ -141,6 +143,9 @@ public:
 	template<> inline void read<uint32_t>(uint32_t &v) { v = readUInt32(); }
 	template<> inline void read<uint64_t>(uint64_t &v) { v = readUInt64(); }
 	template<U, V> inline void read<std::pair<U, V>>(std::pair<U, V> &v) { v = readPair<U, V>(); }
+	
+	template<T> inline T read() { T v; read(v); return v; }
+	template<T> inline void serial(T &v) { read(v); }
 	
 private:
     IStreamReader(IStreamReader const&) = delete;

@@ -83,6 +83,34 @@ void test()
 	std::pair<std::pair<std::string, int>, int> v2 = sr->readPair<std::pair<std::string, int>, int>();
 }
 
+class TestSerializable
+{
+public:
+	virtual void readStream(StreamReader *sr);
+	virtual void writeStream(StreamWriter *sw) const;
+	
+	int32_t a, b, c;
+	
+}
+
+template<T, U>
+void TestSerializable_serial(T &self, U &s)
+{
+	s.serial(self.a);
+	s.serial(self.b);
+	s.serial<int64_t>(self.c);
+}
+
+TestSerializable::readStream(StreamReader *sr)
+{
+	TestSerializable_serial(*this, sr);
+}
+
+TestSerializable::writeStream(StreamWriter *sw) const
+{
+	TestSerializable_serial(std::make_const(*this), sw);
+}
+
 } /* anonymous namespace */
 
 } /* namespace sev */
