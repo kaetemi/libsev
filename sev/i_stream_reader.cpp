@@ -75,6 +75,26 @@ std::string IStreamReader::readString()
 	return res; // implicit std::move
 }
 
+std::string IStreamReader::readLine()
+{
+	std::string res;
+	char c = readChar();
+	while (c && c != '\n' && c != '\r')
+	{
+		res += c;
+		c = readChar();
+	}
+	if (c == '\r')
+	{
+		c = peekChar();
+		if (c == '\n')
+		{
+			readChar();
+		}
+	}
+	return res;
+}
+
 } /* namespace sev */
 
 #include "i_stream_writer.h"

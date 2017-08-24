@@ -48,16 +48,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 ///////////////////////////////////////////////////////////////////////
-// Module selection
+// Module support selection
 ///////////////////////////////////////////////////////////////////////
 
-#define SEV_MODULE_EVENTLOOP
+#define SEV_MODULE_ATOMIC_LOCK
 
-#if defined(SEV_MODULE_EVENTLOOP) && defined(SEV_DEPEND_WIN32_FIBER)
+#define SEV_MODULE_EVENT_LOOP
+
+#define SEV_MODULE_SINGLETON
+
+#if defined(SEV_MODULE_EVENT_LOOP) && defined(SEV_DEPEND_WIN32_FIBER)
 #	define SEV_MODULE_EVENTLOOP_FIBER
 #endif
 
-#ifdef SEV_MODULE_EVENTLOOP
+#ifdef SEV_MODULE_EVENT_LOOP
 #	define SEV_MODULE_STREAM
 #	ifdef SEV_MODULE_EVENTLOOP_FIBER
 #		define SEV_MODULE_STREAM_READER_WRITER

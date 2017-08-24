@@ -110,7 +110,7 @@ public:
 public:
 	// Aliases
 	inline void writeSize(const size_t v) { writeUInt64LE(v); }
-	inline void writeByte(const char v) { writeUInt8LE(v); }
+	inline void writeChar(const char v) { writeUInt8LE(v); }
 	
 	inline void writeInt8(const int8_t v) { writeInt8LE(v); }
 	inline void writeInt16(const int16_t v) { writeInt16LE(v); }

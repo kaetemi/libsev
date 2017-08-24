@@ -106,11 +106,13 @@ public:
 	virtual uint16_t readUInt16LE(int bits) = 0;
 	virtual uint32_t readUInt32LE(int bits) = 0;
 	virtual uint64_t readUInt64LE(int bits) = 0;
+
+	virtual char peekChar() = 0;
 	
 public:
 	// Aliases
 	inline size_t readSize() { return (size_t)readUInt64LE(); }
-	inline char readByte() { return (char)readUInt8LE(); }
+	inline char readChar() { return (char)readUInt8LE(); }
 	
 	inline int8_t readInt8() { return readInt8LE(); }
 	inline int16_t readInt16() { return readInt16LE(); }
@@ -143,6 +145,9 @@ public:
 	
 	template<typename T>
 	T readContainer();
+
+	// Reads string until first occurence of \n, \r\n, or \r. Also stops at \x00
+	virtual std::string readLine();
 	
 public:
 	// Auto
