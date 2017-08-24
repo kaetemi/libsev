@@ -46,7 +46,7 @@ void MainEventLoop::main(MainFunction &&f, const int argc, const char *argv[])
 {
 	MainEventLoop::Instance instance = MainEventLoop::instance();
 	EventLoop *const el = instance.get();
-	el->immediate([f, el, argc, argv]() -> void {
+	el->immediate([f = std::move(f), el, argc, argv]() -> void {
 		f(el, argc, argv);
 	});
 	el->runSync();

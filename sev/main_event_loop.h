@@ -47,6 +47,7 @@ public:
 	virtual ~MainEventLoop();
 	
 	static void main(MainFunction &&f, const int argc, const char *argv[]);
+	inline static void main(MainFunction &f, const int argc, const char *argv[]) { main(MainFunction(f), argc, argv); }
 	
 private:
 	MainEventLoop(MainEventLoop const&) = delete;
