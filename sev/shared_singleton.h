@@ -49,9 +49,9 @@ public:
 
 		}
 
-		inline Instance(Instance &other) : m_Pointer(other.m_Pointer)
+		inline Instance(const Instance &other) : m_Pointer(other.m_Pointer)
 		{
-			s_SingletonRefCount.fetch_add(1);
+			s_SingletonStatic.RefCount.fetch_add(1);
 		}
 
 		Instance &operator=(const Instance &other)
@@ -60,12 +60,12 @@ public:
 			{
 				if (!m_Pointer)
 				{
-					s_SingletonRefCount.fetch_add(1);
+					s_SingletonStatic.RefCount.fetch_add(1);
 				}
 				m_Pointer = other.m_Pointer;
 				if (!m_Pointer)
 				{
-					s_SingletonRefCount.fetch_sub(1);
+					s_SingletonStatic.RefCount.fetch_sub(1);
 				}
 			}
 			return *this;
@@ -75,18 +75,18 @@ public:
 		{
 			if (m_Pointer)
 			{
-				if (s_SingletonRefCount.fetch_sub(1) == 1)
+				if (s_SingletonStatic.RefCount.fetch_sub(1) == 1)
 				{
-					s_SingletonLock.lockWrite();
-					s_SingletonInstance = NULL;
-					s_SingletonLock.unlockWrite();
+					s_SingletonStatic.Lock.lockWrite();
+					s_SingletonStatic.Instance = NULL;
+					s_SingletonStatic.Lock.unlockWrite();
 					delete m_Pointer;
 				}
 			}
 		}
 
-		inline TClass *pointer() { return m_Pointer; }
-		inline const TClass *pointer() const { return m_Pointer; }
+		inline TClass *get() { return m_Pointer; }
+		inline const TClass *get() const { return m_Pointer; }
 
 		inline TClass& operator*() { return *m_Pointer; }
 		inline TClass* operator->() { return m_Pointer; }
@@ -110,45 +110,51 @@ public:
 
 	inline SharedSingleton()
 	{
-		
+
 	}
 
 	template<typename ... TArgs>
 	static Instance instance(TArgs ... args)
 	{
-		s_SingletonRefCount.fetch_add(1);
-		s_SingletonLock.lockRead();
-		TClass *ptr = s_SingletonInstance;
-		s_SingletonLock.unlockRead();
+		s_SingletonStatic.RefCount.fetch_add(1);
+		s_SingletonStatic.Lock.lockRead();
+		TClass *ptr = s_SingletonStatic.Instance;
+		s_SingletonStatic.Lock.unlockRead();
 		if (!ptr)
 		{
-			s_SingletonLock.lockWrite();
-			ptr = s_SingletonInstance;
+			s_SingletonStatic.Lock.lockWrite();
+			ptr = s_SingletonStatic.Instance;
 			if (!ptr)
 			{
 				ptr = new TClass(args ...);
-				s_SingletonInstance = ptr;
+				s_SingletonStatic.Instance = ptr;
 			}
-			s_SingletonLock.unlockWrite();
+			s_SingletonStatic.Lock.unlockWrite();
 		}
 		return Instance(ptr, 0);
 	}
 
 private:
-	static std::atomic_int s_SingletonRefCount;
-	static std::atomic<TClass *> s_SingletonInstance;
-	static AtomicRWLock s_SingletonLock;
+	class SingletonStatic
+	{
+	public:
+		SingletonStatic()
+		{
+			RefCount = 0;
+			Instance = NULL;
+		}
 
-}; /* class SharedSingleton */
+		std::atomic_int RefCount;
+		std::atomic<TClass *> Instance;
+		AtomicRWLock Lock;
+	};
+
+	static SingletonStatic s_SingletonStatic;
+
+};
 
 template <typename TClass>
-std::atomic_int SharedSingleton<TClass>::s_SingletonRefCount = 0;
-
-template <typename TClass>
-std::atomic<TClass *> SharedSingleton<TClass>::s_SingletonInstance = NULL;
-
-template <typename TClass>
-AtomicRWLock SharedSingleton<TClass>::s_SingletonLock;
+typename SharedSingleton<TClass>::SingletonStatic SharedSingleton<TClass>::s_SingletonStatic;
 
 } /* namespace sev */
 
