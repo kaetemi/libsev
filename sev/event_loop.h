@@ -156,22 +156,49 @@ public:
 		syncCond.wait(lock);
 	}
 
-public:
-	void immediate(EventFunction f) // thread-safe
+	/*
+private:
+	template<typename T>
+	inline void immediate_(T &&f) 
 	{
 #ifdef EVENT_LOOP_CONCURRENT_QUEUE
-		m_ImmediateConcurrent.push(f);
+		m_ImmediateConcurrent.push(std::forward<T>(f));
 #else
 		std::unique_lock<EventLoopLock> lock(m_QueueLock);
-		m_Immediate.push(f);
+		m_Immediate.push(std::forward<T>(f));
 #endif
 		poke();
 	}
 
-	template<class rep, class period> void timeout(EventFunction f, const std::chrono::duration<rep, period>& delta) // thread-safe
+public:
+	inline void immediate(const EventFunction &f) // thread-safe
+	{
+		immediate_(f);
+	}
+
+	void immediate(EventFunction &&f) // thread-safe
+	{
+		immediate_(f);
+	}
+	*/
+
+	template<typename T = EventFunction>
+	inline void immediate(T &&f)
+	{
+#ifdef EVENT_LOOP_CONCURRENT_QUEUE
+		m_ImmediateConcurrent.push(std::forward<EventFunction>(f));
+#else
+		std::unique_lock<EventLoopLock> lock(m_QueueLock);
+		m_Immediate.push(std::forward<EventFunction>(f));
+#endif
+		poke();
+	}
+
+	template<class rep, class period, typename T = EventFunction>
+	void timeout(T &&f, const std::chrono::duration<rep, period>& delta) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = f;
+		tf.f = std::forward<EventFunction>(f);
 		tf.time = std::chrono::steady_clock::now() + delta;
 		tf.interval = std::chrono::nanoseconds::zero();
 		; {
@@ -185,10 +212,11 @@ public:
 		poke();
 	}
 
-	template<class rep, class period> void interval(EventFunction f, const std::chrono::duration<rep, period>& interval) // thread-safe
+	template<class rep, class period, typename T = EventFunction> 
+	void interval(T &&f, const std::chrono::duration<rep, period>& interval) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = f;
+		tf.f = std::forward<EventFunction>(f);
 		tf.time = std::chrono::steady_clock::now() + interval;
 		tf.interval = interval;
 		; {
@@ -202,11 +230,11 @@ public:
 		poke();
 	}
 
-
-	void timed(EventFunction f, const std::chrono::steady_clock::time_point &point) // thread-safe
+	template<typename T = EventFunction>
+	void timed(T &&f, const std::chrono::steady_clock::time_point &point) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = f;
+		tf.f = std::forward<EventFunction>(f);
 		tf.time = point;
 		tf.interval = std::chrono::steady_clock::duration::zero();
 		; {
@@ -221,11 +249,12 @@ public:
 	}
 
 public:
-	void thread(EventFunction f, EventFunction callback)
+	template<typename T = EventFunction>
+	void thread(T &&f, T &&callback)
 	{
-		std::thread t([this, f, callback]() -> void {
+		std::thread t([this, f = std::forward(f), callback = std::forward(f)]() mutable -> void {
 			f();
-			immediate(callback);
+			immediate(std::move(callback));
 		});
 		t.detach();
 	}
