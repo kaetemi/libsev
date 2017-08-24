@@ -26,23 +26,31 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+#ifndef SEV_I_STREAM_H
+#define SEV_I_STREAM_H
+
+#include "config.h"
+#ifdef SEV_MODULE_STREAM
+
 namespace sev {
 
-template<typename T, typename U>
-inline void IStreamWriter::writePair(const std::pair<T, U> &v)
+//! Stream
+class SEV_LIB IStream
 {
-	write(v.first);
-	write(v.second);
-}
+public:
+	IStream();
+	virtual ~IStream();
 	
-template<typename T>
-void IStreamWriter::writeContainer(const T &v)
-{
-	for (auto &e : v)
-		writeBool(true), write(v);
-	writeBool(false);
-}
+private:
+	IStream(IStream const&) = delete;
+	IStream& operator=(IStream const&) = delete;
+	
+}; /* class IStream */
 
 } /* namespace sev */
+
+#endif /* #ifdef SEV_MODULE_STREAM */
+
+#endif /* #ifndef SEV_I_STREAM_H */
 
 /* end of file */

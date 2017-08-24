@@ -31,7 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
-IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_READER_BUFFER_DEFAULT)
+IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer)
 	: m_EventFiber(ef),
 	m_Stream(stream), 
 	m_UniqueBuffer(new char[buffer]), m_Buffer(m_UniqueBuffer.get()), 
@@ -41,7 +41,7 @@ IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer = SE
 	
 }
 
-IStreamReader::IStreamReader(char *buffer, size_t index, size_t length)
+IStreamReader::IStreamReader(const char *buffer, size_t index, size_t length)
 	: m_EventFiber(NULL),
 	m_Stream(NULL),
 	m_Buffer(buffer),
@@ -51,7 +51,7 @@ IStreamReader::IStreamReader(char *buffer, size_t index, size_t length)
 	
 }
 
-IStreamReader::IStreamReader(std::shared_ptr<char> buffer, size_t index, size_t length)
+IStreamReader::IStreamReader(std::shared_ptr<const char> buffer, size_t index, size_t length)
 	: m_EventFiber(NULL),
 	m_Stream(NULL),
 	m_SharedBuffer(buffer), m_Buffer(buffer.get()),
@@ -61,7 +61,7 @@ IStreamReader::IStreamReader(std::shared_ptr<char> buffer, size_t index, size_t 
 	
 }
 
-virtual ~IStreamReader()
+IStreamReader::~IStreamReader()
 {
 	
 }
@@ -85,7 +85,7 @@ namespace /* anonymous */ {
 
 void test()
 {
-	IStreamReader *sr;
+	IStreamReader *sr = NULL;
 	std::pair<std::string, int> v1 = sr->readPair<std::string, int>();
 	std::pair<std::pair<std::string, int>, int> v2 = sr->readPair<std::pair<std::string, int>, int>();
 }
@@ -98,24 +98,24 @@ public:
 	
 	int32_t a, b, c;
 	
-}
+};
 
-template<T, U>
+template<typename T, typename U>
 void TestSerializable_serial(T &self, U &s)
 {
 	s.serial(self.a);
 	s.serial(self.b);
-	s.serial<int64_t>(self.c);
+	s.serial(self.c);
 }
 
-TestSerializable::readStream(IStreamReader *sr)
+void TestSerializable::readStream(IStreamReader *sr)
 {
-	TestSerializable_serial(*this, sr);
+	TestSerializable_serial(*this, *sr);
 }
 
-TestSerializable::writeStream(IStreamWriter *sw) const
+void TestSerializable::writeStream(IStreamWriter *sw) const
 {
-	TestSerializable_serial(std::make_const(*this), sw);
+	TestSerializable_serial(*this, *sw);
 }
 
 } /* anonymous namespace */

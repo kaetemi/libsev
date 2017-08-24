@@ -33,12 +33,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef SEV_MODULE_STREAM_READER_WRITER
 
 #include <utility>
+#include <type_traits>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "event_loop.h"
-
 namespace sev {
+	class IStream;
+	class EventFiber;
+
+#ifdef _MSC_VER
+template class SEV_LIB std::_Compressed_pair<std::default_delete<char>, char *, true>;
+template class SEV_LIB std::unique_ptr<char>;
+template class SEV_LIB std::shared_ptr<char>;
+#endif
 
 #define SEV_STREAM_WRITER_BUFFER_DEFAULT (16 * 1024)
 
@@ -72,10 +80,10 @@ public:
 	// Primitives
 	
 	//! Writes a buffer directly. Returns different value from given length on EOF (end of file / out of space) only
-	virtual size_t writeBuffer(char *buffer, size_t index, size_t length) = 0;
+	virtual size_t writeBuffer(const char *buffer, size_t index, size_t length) = 0;
 	
 	//! Writes a bool. Default to false on EOF
-	inline bool writeBool() = 0;
+	virtual void writeBool(bool v) = 0;
 	
 	//! Writes an integer. Default to 0 on EOF
 	virtual void writeInt8LE(int8_t v) = 0;
@@ -129,35 +137,37 @@ public:
 	// Writes a string. Always assume UTF-8
 	void writeString(const std::string &v);
 	
-	template<T, U>
+	template<typename T, typename U>
 	inline void writePair(const std::pair<T, U> &v);
 	
-	template<T>
+	template<typename T>
 	void writeContainer(const T &v);
 	
 public:
 	// Auto
-	template<T> inline void write(const T &v) { v.writeStream(*this); }
-	template<> inline void write<bool>(const bool v) { writeBool(v); }
-	template<> inline void write<size_t>(const size_t v) { writeSize(v); }
-	template<> inline void write<int8_t>(const int8_t v) { writeInt8(v); }
-	template<> inline void write<int16_t>(const int16_t v) { writeInt16(v); }
-	template<> inline void write<int32_t>(const int32_t v) { writeInt32(v); }
-	template<> inline void write<int64_t>(const int64_t v) { writeInt64(v); }
-	template<> inline void write<uint8_t>(const uint8_t v) { writeUInt8(v); }
-	template<> inline void write<uint16_t>(const uint16_t v) { writeUInt16(v); }
-	template<> inline void write<uint32_t>(const uint32_t v) { writeUInt32(v); }
-	template<> inline void write<uint64_t>(const uint64_t v) { writeUInt64(v); }
+	template<typename T> inline void write(const T &v) { v.writeStream(*this); }
+	template<> inline void write<bool>(const bool &v) { writeBool(v); }
+	template<> inline void write<int8_t>(const int8_t &v) { writeInt8(v); }
+	template<> inline void write<int16_t>(const int16_t &v) { writeInt16(v); }
+	template<> inline void write<int32_t>(const int32_t &v) { writeInt32(v); }
+	template<> inline void write<int64_t>(const int64_t &v) { writeInt64(v); }
+	template<> inline void write<uint8_t>(const uint8_t &v) { writeUInt8(v); }
+	template<> inline void write<uint16_t>(const uint16_t &v) { writeUInt16(v); }
+	template<> inline void write<uint32_t>(const uint32_t &v) { writeUInt32(v); }
+	template<> inline void write<uint64_t>(const uint64_t &v) { writeUInt64(v); }
 	template<> inline void write<std::string>(const std::string &v) { writeString(v); }
-	template<U, V> inline void write<std::pair<U, V>>(const std::pair<U, V> &v) { writePair<U, V>(v); }
+	template<typename U, typename V> inline void write(const std::pair<U, V> &v) { writePair<U, V>(v); }
 	
-	template<T> inline void serial(const T &v) { write(v); }
-	
-	template<T> inline void serialContainer(const T &v) { writeContainer<T>(v); }
-	
+	template<typename T> inline void serial(const T &v) { write(v); }
+
+	inline void serialSize(const size_t v) { writeSize(v); }
+	template<typename T> inline void serialContainer(const T &v) { writeContainer<T>(v); }
+
+	inline uint16_t serialVersion(const uint16_t v) { writeUInt16(v); return v; }
+
 private:
-    IStreamWriter(IStreamWriter const&) = delete;
-    IStreamWriter& operator=(IStreamWriter const&) = delete;
+	IStreamWriter(IStreamWriter const&) = delete;
+	IStreamWriter& operator=(IStreamWriter const&) = delete;
 	
 }; /* class IStreamWriter */
 

@@ -28,8 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
-template<T, U>
-inline std::pair<T, U> IStreamReader::readPair()
+template<typename T, typename U>
+inline std::pair<typename T, typename U> IStreamReader::readPair()
 {
 	std::pair<T, U> res;
 	read(res.first);
@@ -37,7 +37,7 @@ inline std::pair<T, U> IStreamReader::readPair()
 	return res;
 }
 	
-template<T>
+template<typename T>
 T IStreamReader::readContainer()
 {
 	T res;

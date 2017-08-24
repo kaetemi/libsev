@@ -33,12 +33,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef SEV_MODULE_STREAM_READER_WRITER
 
 #include <utility>
+#include <type_traits>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "event_loop.h"
-
 namespace sev {
+	class IStream;
+	class EventFiber;
+
+#ifdef _MSC_VER
+template class SEV_LIB std::_Compressed_pair<std::default_delete<char>, char *, true>;
+template class SEV_LIB std::_Compressed_pair<std::default_delete<const char>, char *, true>;
+template class SEV_LIB std::unique_ptr<char>;
+template class SEV_LIB std::shared_ptr<const char>;
+#endif
 
 #define SEV_STREAM_READER_BUFFER_DEFAULT (16 * 1024)
 
@@ -47,16 +56,16 @@ class SEV_LIB IStreamReader
 {
 public:
 	IStreamReader(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_READER_BUFFER_DEFAULT);
-	IStreamReader(char *buffer, size_t index, size_t length);
-	IStreamReader(std::shared_ptr<char> buffer, size_t index, size_t length);
+	IStreamReader(const char *buffer, size_t index, size_t length);
+	IStreamReader(std::shared_ptr<const char> buffer, size_t index, size_t length);
 	virtual ~IStreamReader();
 	
 protected:
 	EventFiber *m_EventFiber;
 	IStream *m_Stream;
 	std::unique_ptr<char> m_UniqueBuffer;
-	std::shared_ptr<char> m_SharedBuffer;
-	char *m_Buffer;
+	std::shared_ptr<const char> m_SharedBuffer;
+	const char *m_Buffer;
 	size_t m_Index;
 	size_t m_Length;
 	bool m_ReadError;
@@ -75,7 +84,7 @@ public:
 	virtual size_t readBuffer(char *buffer, size_t index, size_t length) = 0;
 	
 	//! Reads a bool. Default to false on EOF
-	inline bool readBool() = 0;
+	virtual inline bool readBool() = 0;
 	
 	//! Reads an integer. Default to 0 on EOF
 	virtual int8_t readInt8LE() = 0;
@@ -129,17 +138,16 @@ public:
 	// Reads a string. Always assume UTF-8
 	std::string readString();
 	
-	template<T, U>
+	template<typename T, typename U>
 	inline std::pair<T, U> readPair();
 	
-	template<T>
+	template<typename T>
 	T readContainer();
 	
 public:
 	// Auto
-	template<T> inline void read(T &v) { v.readStream(*this); }
+	template<typename T> inline void read(T &v) { v.readStream(*this); }
 	template<> inline void read<bool>(bool &v) { v = readBool(); }
-	template<> inline void read<size_t>(size_t &v) { v = readSize(); }
 	template<> inline void read<int8_t>(int8_t &v) { v = readInt8(); }
 	template<> inline void read<int16_t>(int16_t &v) { v = readInt16(); }
 	template<> inline void read<int32_t>(int32_t &v) { v = readInt32(); }
@@ -149,16 +157,19 @@ public:
 	template<> inline void read<uint32_t>(uint32_t &v) { v = readUInt32(); }
 	template<> inline void read<uint64_t>(uint64_t &v) { v = readUInt64(); }
 	template<> inline void read<std::string>(std::string &v) { v = readString(); }
-	template<U, V> inline void read<std::pair<U, V>>(std::pair<U, V> &v) { v = readPair<U, V>(); }
+	template<typename U, typename V> inline void read(std::pair<U, V> &v) { v = readPair<U, V>(); }
 	
-	template<T> inline T read() { T v; read(v); return v; }
-	template<T> inline void serial(T &v) { read(v); }
-	
-	template<T> inline void serialContainer(T &v) { v = readContainer<T>(); }
+	template<typename T> inline T read() { T v; read(v); return v; }
+	template<typename T> inline void serial(T &v) { read(v); }
+
+	inline void serialSize(size_t &v) { v = readSize(); }
+	template<typename T> inline void serialContainer(T &v) { v = readContainer<T>(); }
+
+	inline uint16_t serialVersion(const uint16_t v) { return readUInt16(); }
 	
 private:
-    IStreamReader(IStreamReader const&) = delete;
-    IStreamReader& operator=(IStreamReader const&) = delete;
+	IStreamReader(IStreamReader const&) = delete;
+	IStreamReader& operator=(IStreamReader const&) = delete;
 	
 }; /* class IStreamReader */
 

@@ -31,12 +31,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
-IStreamWriter::IStreamWriter(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_READER_BUFFER_DEFAULT)
+IStreamWriter::IStreamWriter(EventFiber *ef, IStream *stream, size_t buffer)
 	: m_EventFiber(ef),
 	m_Stream(stream), 
 	m_UniqueBuffer(new char[buffer]), m_Buffer(m_UniqueBuffer.get()), 
 	m_Index(0), m_Length(buffer),
-	m_ReadError(false)
+	m_WriteError(false)
 {
 	
 }
@@ -46,7 +46,7 @@ IStreamWriter::IStreamWriter(char *buffer, size_t index, size_t length)
 	m_Stream(NULL),
 	m_Buffer(buffer),
 	m_Index(index), m_Length(length),
-	m_ReadError(false)
+	m_WriteError(false)
 {
 	
 }
@@ -56,12 +56,12 @@ IStreamWriter::IStreamWriter(std::shared_ptr<char> buffer, size_t index, size_t 
 	m_Stream(NULL),
 	m_SharedBuffer(buffer), m_Buffer(buffer.get()),
 	m_Index(index), m_Length(length),
-	m_ReadError(false)
+	m_WriteError(false)
 {
 	
 }
 
-virtual ~IStreamWriter()
+IStreamWriter::~IStreamWriter()
 {
 	
 }
@@ -70,7 +70,7 @@ void IStreamWriter::writeString(const std::string &v)
 {
 	const size_t size = v.size();
 	writeSize(size);
-	writeBuffer(&res[0], 0, size);
+	writeBuffer(v.c_str(), 0, size);
 }
 
 } /* namespace sev */
