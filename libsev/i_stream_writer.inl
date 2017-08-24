@@ -34,6 +34,14 @@ inline void IStreamWriter::writePair(const std::pair<T, U> &v)
 	write(v.first);
 	write(v.second);
 }
+	
+template<T>
+void IStreamWriter::writeContainer(const T &v)
+{
+	for (auto &e : v)
+		writeBool(true), write(v);
+	writeBool(false);
+}
 
 } /* namespace sev */
 

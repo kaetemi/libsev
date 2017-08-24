@@ -129,6 +129,9 @@ public:
 	template<T, U>
 	inline std::pair<T, U> readPair();
 	
+	template<T>
+	T readContainer();
+	
 public:
 	// Auto
 	template<T> inline void read(T &v) { v.readStream(*this); }
@@ -147,6 +150,8 @@ public:
 	
 	template<T> inline T read() { T v; read(v); return v; }
 	template<T> inline void serial(T &v) { read(v); }
+	
+	template<T> inline void serialContainer(T &v) { v = readContainer<T>(); }
 	
 private:
     IStreamReader(IStreamReader const&) = delete;

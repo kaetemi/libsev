@@ -129,6 +129,9 @@ public:
 	template<T, U>
 	inline void writePair(const std::pair<T, U> &v);
 	
+	template<T>
+	void writeContainer(const T &v);
+	
 public:
 	// Auto
 	template<T> inline void write(const T &v) { v.writeStream(*this); }
@@ -146,6 +149,8 @@ public:
 	template<U, V> inline void write<std::pair<U, V>>(const std::pair<U, V> &v) { writePair<U, V>(v); }
 	
 	template<T> inline void serial(const T &v) { write(v); }
+	
+	template<T> inline void serialContainer(const T &v) { writeContainer<T>(v); }
 	
 private:
     IStreamWriter(IStreamWriter const&) = delete;

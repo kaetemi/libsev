@@ -36,6 +36,15 @@ inline std::pair<T, U> IStreamReader::readPair()
 	read(res.second);
 	return res;
 }
+	
+template<T>
+T IStreamReader::readContainer()
+{
+	T res;
+	while (readBool())
+		res.insert(res.end(), read<T::value_type>());
+	return res;
+}
 
 } /* namespace sev */
 
