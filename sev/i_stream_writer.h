@@ -42,12 +42,6 @@ namespace sev {
 	class IStream;
 	class EventFiber;
 
-#ifdef _MSC_VER
-template class SEV_LIB std::_Compressed_pair<std::default_delete<char>, char *, true>;
-template class SEV_LIB std::unique_ptr<char>;
-template class SEV_LIB std::shared_ptr<char>;
-#endif
-
 #define SEV_STREAM_WRITER_BUFFER_DEFAULT (16 * 1024)
 
 //! Stream writer
@@ -60,6 +54,10 @@ public:
 	virtual ~IStreamWriter();
 	
 protected:
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4251)
+#endif
 	EventFiber *m_EventFiber;
 	IStream *m_Stream;
 	std::unique_ptr<char> m_UniqueBuffer;
@@ -68,6 +66,9 @@ protected:
 	size_t m_Index;
 	size_t m_Length;
 	bool m_WriteError;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 	
 public:
 	//! Must update the event fiber whenever ownership is transfered over to another event fiber. Event fiber is only required when writing from a stream
