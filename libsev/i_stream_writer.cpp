@@ -26,11 +26,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#include "i_stream_reader.h"
+#include "i_stream_writer.h"
 
 namespace sev {
 
-IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_READER_BUFFER_DEFAULT)
+IStreamWriter::IStreamWriter(EventFiber *ef, IStream *stream, size_t buffer = SEV_STREAM_READER_BUFFER_DEFAULT)
 	: m_EventFiber(ef),
 	m_Stream(stream), 
 	m_UniqueBuffer(new char[buffer]), m_Buffer(m_UniqueBuffer.get()), 
@@ -40,7 +40,7 @@ IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer = SE
 	
 }
 
-IStreamReader::IStreamReader(char *buffer, size_t index, size_t length)
+IStreamWriter::IStreamWriter(char *buffer, size_t index, size_t length)
 	: m_EventFiber(NULL),
 	m_Stream(NULL),
 	m_Buffer(buffer),
@@ -50,7 +50,7 @@ IStreamReader::IStreamReader(char *buffer, size_t index, size_t length)
 	
 }
 
-IStreamReader::IStreamReader(std::shared_ptr<char> buffer, size_t index, size_t length)
+IStreamWriter::IStreamWriter(std::shared_ptr<char> buffer, size_t index, size_t length)
 	: m_EventFiber(NULL),
 	m_Stream(NULL),
 	m_SharedBuffer(buffer), m_Buffer(buffer.get()),
@@ -60,64 +60,17 @@ IStreamReader::IStreamReader(std::shared_ptr<char> buffer, size_t index, size_t 
 	
 }
 
-virtual ~IStreamReader()
+virtual ~IStreamWriter()
 {
 	
 }
 
-std::string IStreamReader::readString()
+void IStreamWriter::writeString(const std::string &v)
 {
-	std::string res;
-	const size_t size = readSize();
-	res.resize(size); // WASTE: stl clears to 0, only need to clear first byte to 0 and last + 1 to zero
-	res.resize(readBuffer(&res[0], 0, size)); // resize in case EOF
-	return res; // implicit std::move
+	const size_t size = v.size();
+	writeSize(size);
+	writeBuffer(&res[0], 0, size);
 }
-
-} /* namespace sev */
-
-#include "i_stream_writer.h"
-
-namespace sev {
-
-namespace /* anonymous */ {
-
-void test()
-{
-	IStreamReader *sr;
-	std::pair<std::string, int> v1 = sr->readPair<std::string, int>();
-	std::pair<std::pair<std::string, int>, int> v2 = sr->readPair<std::pair<std::string, int>, int>();
-}
-
-class TestSerializable
-{
-public:
-	virtual void readStream(IStreamReader *sr);
-	virtual void writeStream(IStreamWriter *sw) const;
-	
-	int32_t a, b, c;
-	
-}
-
-template<T, U>
-void TestSerializable_serial(T &self, U &s)
-{
-	s.serial(self.a);
-	s.serial(self.b);
-	s.serial<int64_t>(self.c);
-}
-
-TestSerializable::readStream(IStreamReader *sr)
-{
-	TestSerializable_serial(*this, sr);
-}
-
-TestSerializable::writeStream(IStreamWriter *sw) const
-{
-	TestSerializable_serial(std::make_const(*this), sw);
-}
-
-} /* anonymous namespace */
 
 } /* namespace sev */
 

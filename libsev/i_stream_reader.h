@@ -142,6 +142,7 @@ public:
 	template<> inline void read<uint16_t>(uint16_t &v) { v = readUInt16(); }
 	template<> inline void read<uint32_t>(uint32_t &v) { v = readUInt32(); }
 	template<> inline void read<uint64_t>(uint64_t &v) { v = readUInt64(); }
+	template<> inline void read<std::string>(std::string &v) { v = readString(); }
 	template<U, V> inline void read<std::pair<U, V>>(std::pair<U, V> &v) { v = readPair<U, V>(); }
 	
 	template<T> inline T read() { T v; read(v); return v; }
