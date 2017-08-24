@@ -26,11 +26,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_EVENT_LOOP_H
-#define SEV_EVENT_LOOP_H
+#ifndef SEV_LITE_EVENT_LOOP_H
+#define SEV_LITE_EVENT_LOOP_H
 
-#include "config.h"
-#ifdef SEV_MODULE_EVENT_LOOP
+#ifdef _MSC_VER
+#	define SEV_LITE_DEPEND_MSVC_CONCURRENT
+#endif
+
+#ifdef WIN32
+#	define SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#endif
 
 #include <thread>
 #include <mutex>
@@ -41,28 +46,26 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <queue>
 #include <set>
 
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 #	include <concurrent_queue.h>
 #	include <concurrent_priority_queue.h>
-#else
-#	include "atomic_mutex.h"
 #endif
 
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 #	define WIN32_LEAN_AND_MEAN
 #	include <Windows.h>
 #endif
 
-namespace sev {
+namespace sev_lite {
 
 typedef std::function<void()> EventFunction;
 
-class SEV_LIB EventLoop
+class EventLoop
 {
 public:
 	EventLoop() : m_Running(false), m_Cancel(false)
 	{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 		m_PokeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 #endif
 	}
@@ -71,7 +74,7 @@ public:
 	{
 		stop();
 		clear();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 		CloseHandle(m_PokeEvent);
 #endif
 	}
@@ -100,12 +103,12 @@ public:
 
 	void clear() // semi-thread-safe
 	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 		m_ImmediateConcurrent.clear();
 		m_TimeoutConcurrent.clear();
 #else
-		std::unique_lock<AtomicMutex> lock(m_QueueLock);
-		std::unique_lock<AtomicMutex> tlock(m_QueueTimeoutLock);
+		std::unique_lock<std::mutex> lock(m_QueueLock);
+		std::unique_lock<std::mutex> tlock(m_QueueTimeoutLock);
 		m_Immediate = std::move(std::queue<EventFunction>());
 		m_Timeout = std::move(std::priority_queue<timeout_func>());
 #endif
@@ -124,12 +127,12 @@ public:
 		std::condition_variable syncCond;
 		std::unique_lock<std::mutex> lock(syncLock);
 		EventFunction syncFunc = [this, &syncLock, &syncCond, &syncFunc, empty]() -> void {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 			if (empty && !m_ImmediateConcurrent.empty())
 #else
 			bool immediateEmpty;
 			; {
-				std::unique_lock<AtomicMutex> lock(m_QueueLock);
+				std::unique_lock<std::mutex> lock(m_QueueLock);
 				immediateEmpty = m_Immediate.empty();
 			}
 			if (empty && !immediateEmpty)
@@ -147,39 +150,13 @@ public:
 		syncCond.wait(lock);
 	}
 
-	/*
-private:
-	template<typename T>
-	inline void immediate_(T &&f) 
-	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
-		m_ImmediateConcurrent.push(std::forward<T>(f));
-#else
-		std::unique_lock<AtomicMutex> lock(m_QueueLock);
-		m_Immediate.push(std::forward<T>(f));
-#endif
-		poke();
-	}
-
-public:
-	inline void immediate(const EventFunction &f) // thread-safe
-	{
-		immediate_(f);
-	}
-
-	void immediate(EventFunction &&f) // thread-safe
-	{
-		immediate_(f);
-	}
-	*/
-
 	template<typename T = EventFunction>
 	inline void immediate(T &&f)
 	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 		m_ImmediateConcurrent.push(std::forward<EventFunction>(f));
 #else
-		std::unique_lock<AtomicMutex> lock(m_QueueLock);
+		std::unique_lock<std::mutex> lock(m_QueueLock);
 		m_Immediate.push(std::forward<EventFunction>(f));
 #endif
 		poke();
@@ -193,10 +170,10 @@ public:
 		tf.time = std::chrono::steady_clock::now() + delta;
 		tf.interval = std::chrono::nanoseconds::zero();
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
-			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
+			std::unique_lock<std::mutex> lock(m_QueueTimeoutLock);
 			m_Timeout.push(std::move(tf));
 #endif
 		}
@@ -211,10 +188,10 @@ public:
 		tf.time = std::chrono::steady_clock::now() + interval;
 		tf.interval = interval;
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
-			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
+			std::unique_lock<std::mutex> lock(m_QueueTimeoutLock);
 			m_Timeout.push(std::move(tf));
 #endif
 		}
@@ -229,10 +206,10 @@ public:
 		tf.time = point;
 		tf.interval = std::chrono::steady_clock::duration::zero();
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
-			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
+			std::unique_lock<std::mutex> lock(m_QueueTimeoutLock);
 			m_Timeout.push(std::move(tf));
 #endif
 		}
@@ -255,13 +232,13 @@ private:
 	{
 		while (m_Running)
 		{
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifndef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 			m_Poked = false;
 #endif
 
 			for (;;)
 			{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 				EventFunction f;
 				if (!m_ImmediateConcurrent.try_pop(f))
 					break;
@@ -282,7 +259,7 @@ private:
 			bool poked = false;
 			for (;;)
 			{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 				timeout_func tf;
 				if (!m_TimeoutConcurrent.try_pop(tf))
 					break;
@@ -297,19 +274,19 @@ private:
 				const timeout_func &tfr = m_Timeout.top();
 #endif
 				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 				DWORD wt = (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(tfr.time - now).count();
 				if (tfr.time > now && wt > 0)
 #else
 				if (tfr.time > now) // wait
 #endif
 				{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 					m_TimeoutConcurrent.push(tf);
 #else
 					m_QueueTimeoutLock.unlock();
 #endif
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 					WaitForSingleObject(m_PokeEvent, wt);
 #else
 					; {
@@ -321,7 +298,7 @@ private:
 					poked = true;
 					break;
 				}
-#ifndef SEV_DEPEND_MSVC_CONCURRENT
+#ifndef SEV_LITE_DEPEND_MSVC_CONCURRENT
 				timeout_func tf = tfr;
 				m_Timeout.pop();
 				m_QueueTimeoutLock.unlock();
@@ -332,10 +309,10 @@ private:
 				{
 					tf.time += tf.interval;
 					; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 						m_TimeoutConcurrent.push(std::move(tf));
 #else
-						std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
+						std::unique_lock<std::mutex> lock(m_QueueTimeoutLock);
 						m_Timeout.push(std::move(tf));
 #endif
 					}
@@ -344,7 +321,7 @@ private:
 
 			if (!poked)
 			{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 				WaitForSingleObject(m_PokeEvent, INFINITE);
 #else
 				std::unique_lock<std::mutex> lock(m_PokeLock);
@@ -357,7 +334,7 @@ private:
 
 	void poke() // private
 	{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifdef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 		SetEvent(m_PokeEvent);
 #else
 		std::unique_lock<std::mutex> lock(m_PokeLock);
@@ -382,34 +359,32 @@ private:
 
 private:
 	bool m_Running;
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifndef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 	volatile bool m_Poked;
 #endif
 	std::thread m_Thread;
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
+#ifndef SEV_LITE_DEPEND_WIN32_SYNCHRONIZATION_EVENT
 	std::mutex m_PokeLock;
 	std::condition_variable m_PokeCond;
 #else
 	HANDLE m_PokeEvent;
 #endif
 
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_LITE_DEPEND_MSVC_CONCURRENT
 	concurrency::concurrent_queue<EventFunction> m_ImmediateConcurrent;
 	concurrency::concurrent_priority_queue<timeout_func> m_TimeoutConcurrent;
 #else
-	AtomicMutex m_QueueLock;
+	std::mutex m_QueueLock;
 	std::queue<EventFunction> m_Immediate;
-	AtomicMutex m_QueueTimeoutLock;
+	std::mutex m_QueueTimeoutLock;
 	std::priority_queue<timeout_func> m_Timeout;
 #endif
 	bool m_Cancel;
 
 }; /* class EventLoop */
 
-} /* namespace sev */
+} /* namespace sev_lite */
 
-#endif /* #ifdef SEV_MODULE_EVENT_LOOP */
-
-#endif /* SEV_EVENT_LOOP_H */
+#endif /* SEV_LITE_EVENT_LOOP_H */
 
 /* end of file */

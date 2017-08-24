@@ -64,5 +64,6 @@ SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 ADD_SUBDIRECTORY(sev)
 ADD_SUBDIRECTORY(sev_static)
+ADD_SUBDIRECTORY(sev_lite)
 
 ########################################################################

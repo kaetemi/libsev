@@ -34,7 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
-#	define SEV_DEPEND_MSVC_CONCURRENCY
+#	define SEV_DEPEND_MSVC_CONCURRENT
 #endif
 
 #ifdef WIN32
@@ -51,7 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Module support selection
 ///////////////////////////////////////////////////////////////////////
 
-#define SEV_MODULE_ATOMIC_LOCK
+#define SEV_MODULE_ATOMIC_MUTEX
 
 #define SEV_MODULE_EVENT_LOOP
 
@@ -97,10 +97,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #define NULL nullptr
 
+#if defined(_DEBUG) && !defined(NDEBUG)
+#	define SEV_DEBUG
+#else
+#	define SEV_RELEASE
+#endif
+
 #ifdef _MSC_VER
 #	define SEV_FORCE_INLINE __forceinline
 #else
 #	define SEV_FORCE_INLINE inline __attribute__((always_inline))
+#endif
+
+#ifdef _MSC_VER
+#define SEV_DEBUG_BREAK() __debugbreak()
+#else
+#define SEV_DEBUG_BREAK() __builtin_trap()
 #endif
 
 ///////////////////////////////////////////////////////////////////////

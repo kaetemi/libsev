@@ -26,24 +26,32 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_ATOMIC_LOCK_H
-#define SEV_ATOMIC_LOCK_H
+#ifndef SEV_ATOMIC_MUTEX_H
+#define SEV_ATOMIC_MUTEX_H
 
 #include "config.h"
-#ifdef SEV_MODULE_ATOMIC_LOCK
+#ifdef SEV_MODULE_ATOMIC_MUTEX
 
 #include <atomic>
 #include <thread>
 
 namespace sev {
 
-class SEV_LIB AtomicLock
+class SEV_LIB AtomicMutex
 {
 public:
-	inline AtomicLock()
+	inline AtomicMutex()
 	{
 		m_Atomic.clear();
 	}
+
+#ifdef SEV_DEBUG
+	inline ~AtomicMutex()
+	{
+		if (!tryLock())
+			SEV_DEBUG_BREAK(); // Must be unlocked before destroying
+	}
+#endif
 
 	inline void lock()
 	{
@@ -70,25 +78,33 @@ private:
 	std::atomic_flag m_Atomic;
 
 private:
-	AtomicLock &operator=(const AtomicLock&) = delete;
-	AtomicLock(const AtomicLock&) = delete;
+	AtomicMutex &operator=(const AtomicMutex&) = delete;
+	AtomicMutex(const AtomicMutex&) = delete;
 
-}; /* class AtomicLock */
+}; /* class AtomicMutex */
 
 } /* namespace sev */
 
-#else /* #ifdef SEV_MODULE_ATOMIC_LOCK */
+#else /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
 
 #include <mutex>
 
 namespace sev {
 
-typedef std::mutex AtomicLock;
+class SEV_LIB AtomicMutex : public std::mutex
+{
+public:
+	inline bool tryLock()
+	{
+		return try_lock();
+	}
+
+}; /* class AtomicMutex */
 
 } /* namespace sev */
 
-#endif /* #ifdef SEV_MODULE_ATOMIC_LOCK */
+#endif /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
 
-#endif /* SEV_ATOMIC_LOCK_H */
+#endif /* SEV_ATOMIC_MUTEX_H */
 
 /* end of file */

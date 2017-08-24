@@ -32,7 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "config.h"
 #ifdef SEV_MODULE_SINGLETON
 
-#include "atomic_rw_lock.h"
+#include "atomic_shared_mutex.h"
 
 namespace sev {
 
@@ -77,10 +77,13 @@ public:
 			{
 				if (s_SingletonStatic.RefCount.fetch_sub(1) == 1)
 				{
-					s_SingletonStatic.Lock.lockWrite();
-					s_SingletonStatic.Instance = NULL;
-					s_SingletonStatic.Lock.unlockWrite();
-					delete m_Pointer;
+					bool remove;
+					s_SingletonStatic.Mutex.lock();
+					if (remove = (s_SingletonStatic.RefCount.load() == 0))
+						s_SingletonStatic.Instance = NULL;
+					s_SingletonStatic.Mutex.unlock();
+					if (remove)
+						delete m_Pointer;
 				}
 			}
 		}
@@ -117,19 +120,19 @@ public:
 	static Instance instance(TArgs ... args)
 	{
 		s_SingletonStatic.RefCount.fetch_add(1);
-		s_SingletonStatic.Lock.lockRead();
+		s_SingletonStatic.Mutex.lockShared();
 		TClass *ptr = s_SingletonStatic.Instance;
-		s_SingletonStatic.Lock.unlockRead();
+		s_SingletonStatic.Mutex.unlockShared();
 		if (!ptr)
 		{
-			s_SingletonStatic.Lock.lockWrite();
+			s_SingletonStatic.Mutex.lock();
 			ptr = s_SingletonStatic.Instance;
 			if (!ptr)
 			{
 				ptr = new TClass(args ...);
 				s_SingletonStatic.Instance = ptr;
 			}
-			s_SingletonStatic.Lock.unlockWrite();
+			s_SingletonStatic.Mutex.unlock();
 		}
 		return Instance(ptr, 0);
 	}
@@ -146,7 +149,7 @@ private:
 
 		std::atomic_int RefCount;
 		std::atomic<TClass *> Instance;
-		AtomicRWLock Lock;
+		AtomicSharedMutex Mutex;
 	};
 
 	static SingletonStatic s_SingletonStatic;
