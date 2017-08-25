@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "config.h"
 
 #include <string>
+#include <cstring>
 
 namespace sev {
 
@@ -60,7 +61,7 @@ inline crc32_t crc32(const std::string &str)
 
 inline crc32_t crc32_runtime(const char *str)
 {
-	return crc32(str, strlen(str));
+	return crc32(str, strlen(str)); // OPTIMIZE: May be better to use a modified version of the const to build-in the strlen feature
 }
 
 constexpr crc32_t crc32_const(const char * str)
