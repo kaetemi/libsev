@@ -26,40 +26,56 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_MAIN_EVENT_LOOP_H
-#define SEV_MAIN_EVENT_LOOP_H
+#ifndef SEV_CRC32_H
+#define SEV_CRC32_H
 
 #include "config.h"
-#ifdef SEV_MODULE_EVENT_LOOP
-#ifdef SEV_MODULE_SINGLETON
 
-#include "event_loop.h"
-#include "shared_singleton.h"
+#include <string>
 
 namespace sev {
 
-typedef std::function<void(EventLoop *el, int argc, const char *argv[])> MainFunction;
+typedef uint32_t crc32_t;
 
-class SEV_LIB MainEventLoop : public EventLoop, public SharedSingleton<MainEventLoop>
+namespace impl {
+
+// Author: https://gist.github.com/vivkin/8005639
+// ->
+constexpr unsigned int CRC32_TABLE[] = {
+	0x00000000, 0x1DB71064, 0x3B6E20C8, 0x26D930AC, 0x76DC4190, 0x6B6B51F4, 0x4DB26158, 0x5005713C,
+	0xEDB88320, 0xF00F9344, 0xD6D6A3E8, 0xCB61B38C, 0x9B64C2B0, 0x86D3D2D4, 0xA00AE278, 0xBDBDF21C
+};
+constexpr unsigned int crc32_4(char c, unsigned int h) { return (h >> 4) ^ CRC32_TABLE[(h & 0xF) ^ c]; }
+constexpr unsigned int crc32(const char *s, unsigned int h = ~0) { return !*s ? ~h : crc32(s + 1, crc32_4(*s >> 4, crc32_4(*s & 0xF, h))); }
+// <-
+
+}
+
+SEV_LIB crc32_t crc32(const void *buffer, size_t length);
+
+inline crc32_t crc32(const std::string &str)
 {
-public:
-	MainEventLoop();
-	virtual ~MainEventLoop();
-	
-	static void main(MainFunction &&f, int argc, const char *argv[]);
-	inline static void main(const MainFunction &f, int argc, const char *argv[]) { main(MainFunction(f), argc, argv); }
-	
-private:
-	MainEventLoop(MainEventLoop const&) = delete;
-	MainEventLoop& operator=(MainEventLoop const&) = delete;
-	
-}; /* class MainEventLoop */
+	return crc32(str.c_str(), str.size());
+}
+
+inline crc32_t crc32_runtime(const char *str)
+{
+	return crc32(str, strlen(str));
+}
+
+constexpr crc32_t crc32_const(const char * str)
+{
+	return impl::crc32(str);
+}
+
+template<typename T>
+constexpr crc32_t crc32(T && X)
+{
+	return noexcept(X) ? crc32_const(X) : crc32_runtime(X);
+}
 
 } /* namespace sev */
 
-#endif /* #ifdef SEV_MODULE_SINGLETON */
-#endif /* #ifdef SEV_MODULE_EVENT_LOOP */
-
-#endif /* #ifndef SEV_MAIN_EVENT_LOOP_H */
+#endif /* #ifndef SEV_CRC32_H */
 
 /* end of file */

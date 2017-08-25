@@ -42,7 +42,7 @@ MainEventLoop::~MainEventLoop()
 	
 }
 
-void MainEventLoop::main(MainFunction &&f, const int argc, const char *argv[])
+void MainEventLoop::main(MainFunction &&f, int argc, const char *argv[])
 {
 	MainEventLoop::Instance instance = MainEventLoop::instance();
 	EventLoop *const el = instance.get();
@@ -51,6 +51,24 @@ void MainEventLoop::main(MainFunction &&f, const int argc, const char *argv[])
 	});
 	el->runSync();
 }
+
+} /* namespace sev */
+
+namespace sev {
+
+namespace /* anonymous */ {
+
+void f(sev::EventLoop *el, int argc, const char *argv[])
+{
+	// ...
+}
+
+void main(int argc, const char *argv[])
+{
+	MainEventLoop::main(f, argc, argv);
+}
+
+} /* anonymous namespace */
 
 } /* namespace sev */
 

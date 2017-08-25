@@ -26,40 +26,46 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_MAIN_EVENT_LOOP_H
-#define SEV_MAIN_EVENT_LOOP_H
-
-#include "config.h"
-#ifdef SEV_MODULE_EVENT_LOOP
-#ifdef SEV_MODULE_SINGLETON
-
-#include "event_loop.h"
-#include "shared_singleton.h"
+#include "crc32.h"
+#include "impl/crc32_brumme.h"
 
 namespace sev {
-
-typedef std::function<void(EventLoop *el, int argc, const char *argv[])> MainFunction;
-
-class SEV_LIB MainEventLoop : public EventLoop, public SharedSingleton<MainEventLoop>
+	
+SEV_LIB crc32_t crc32(const void *buffer, size_t length)
 {
-public:
-	MainEventLoop();
-	virtual ~MainEventLoop();
-	
-	static void main(MainFunction &&f, int argc, const char *argv[]);
-	inline static void main(const MainFunction &f, int argc, const char *argv[]) { main(MainFunction(f), argc, argv); }
-	
-private:
-	MainEventLoop(MainEventLoop const&) = delete;
-	MainEventLoop& operator=(MainEventLoop const&) = delete;
-	
-}; /* class MainEventLoop */
+	return crc32_fast(buffer, length);
+}
+
+namespace /* anonymous */ {
+
+namespace test {
+
+template<crc32_t v>
+crc32_t getV() { return v; }
+
+void test()
+{
+	// Compilation must succeed
+	getV<300>();
+	getV<crc32("What")>();
+	getV<crc32_const("What")>();
+	crc32("What");
+	crc32(std::string("Hello world").c_str());
+	int i = 0;
+
+	// Complation must fail
+	// getV<i>();
+
+	// getV<crc32_runtime("What")>();
+	// getV<crc32(std::string("Hello world").c_str())>();
+
+	// getV<crc32_const(std::string("Hello world").c_str())>();
+}
+
+}
+
+} /* anonymous namespace */
 
 } /* namespace sev */
-
-#endif /* #ifdef SEV_MODULE_SINGLETON */
-#endif /* #ifdef SEV_MODULE_EVENT_LOOP */
-
-#endif /* #ifndef SEV_MAIN_EVENT_LOOP_H */
 
 /* end of file */
