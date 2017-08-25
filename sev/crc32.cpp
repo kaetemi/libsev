@@ -1,4 +1,4 @@
-/*
+﻿/*
 
 Copyright (C) 2017  by authors
 Author: Jan Boon <support@no-break.space>
@@ -38,7 +38,7 @@ SEV_LIB crc32_t crc32(const void *buffer, size_t length)
 
 namespace /* anonymous */ {
 
-namespace test {
+namespace t̶̡̨̤̭̙̘͇̲̺̫͎͔̲̟̕͠é҉͉̼̜̮̹̝͡ś̷̷̨̛̻̮̤̣̱̹͈̞͕͔̤̘̤ͅt҉̰͚̘͖͙̩̮̼̤͕͙̳͕̞͔̘͜ͅ {
 
 template<crc32_t v>
 crc32_t getV() { return v; }
