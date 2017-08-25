@@ -115,16 +115,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_DEBUG_BREAK() __builtin_trap()
 #endif
 
-#ifdef WIN32
-#	ifndef MAX_PATH /* No Win32 headers included yet. Use #include <minwindef.h> in headers */
-#		define NOMINMAX
-#		define NTDDI_VERSION 0x06000000 /* NTDDI_VISTA */
-#		define _WIN32_WINNT 0x0600 /* _WIN32_WINNT_VISTA */
-#		define WINVER 0x0600 /* _WIN32_WINNT_VISTA */
-#		define WIN32_LEAN_AND_MEAN
-#	endif
-#endif
-
 ///////////////////////////////////////////////////////////////////////
 
 #endif /* SEV_CONFIG_H */
