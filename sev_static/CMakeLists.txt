@@ -1,7 +1,7 @@
 
-FILE(GLOB SRCS ../sev/*.cpp)
-FILE(GLOB HDRS ../sev/*.h)
-FILE(GLOB INLS ../sev/*.inl)
+FILE(GLOB SRCS ../sev/*.cpp ../sev/impl/*.cpp)
+FILE(GLOB HDRS ../sev/*.h ../sev/impl/*.h)
+FILE(GLOB INLS ../sev/*.inl ../sev/impl/*.inl)
 
 SOURCE_GROUP("" FILES ${SRCS} ${HDRS} ${INLS})
 

@@ -1,7 +1,7 @@
 /*
 
-Copyright (C) 2016-2017  by authors
-Author: Jan Boon <jan.boon@kaetemi.be>
+Copyright (C) 2017  by authors
+Author: Jan Boon <support@no-break.space>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -26,85 +26,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_ATOMIC_MUTEX_H
-#define SEV_ATOMIC_MUTEX_H
+#ifndef SEV_CONFIG_WIN32_H
+#define SEV_CONFIG_WIN32_H
 
-#include "config.h"
-#ifdef SEV_MODULE_ATOMIC_MUTEX
+#include "../config.h"
 
-#include <atomic>
-#include <thread>
+#ifdef WIN32
 
-namespace sev {
+#define NOMINMAX
+#define NTDDI_VERSION 0x06000000 /* NTDDI_VISTA */
+#define _WIN32_WINNT 0x0600 /* _WIN32_WINNT_VISTA */
+#define WINVER 0x0600 /* _WIN32_WINNT_VISTA */
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
-class SEV_LIB AtomicMutex
-{
-public:
-	inline AtomicMutex()
-	{
-		m_Atomic.clear();
-	}
+#endif /* #ifdef WIN32 */
 
-#ifdef SEV_DEBUG
-	inline ~AtomicMutex()
-	{
-		if (!tryLock())
-			SEV_DEBUG_BREAK(); // Must be unlocked before destroying
-	}
-#endif
-
-	inline void lock()
-	{
-		while (m_Atomic.test_and_set())
-			std::this_thread::yield();
-	}
-
-	inline bool try_lock()
-	{
-		return !m_Atomic.test_and_set();
-	}
-
-	inline bool tryLock()
-	{
-		return try_lock();
-	}
-
-	inline void unlock()
-	{
-		m_Atomic.clear();
-	}
-
-private:
-	std::atomic_flag m_Atomic;
-
-private:
-	AtomicMutex &operator=(const AtomicMutex&) = delete;
-	AtomicMutex(const AtomicMutex&) = delete;
-
-}; /* class AtomicMutex */
-
-} /* namespace sev */
-
-#else /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
-
-#include <mutex>
-
-namespace sev {
-
-class SEV_LIB AtomicMutex : public std::mutex
-{
-public:
-	inline bool tryLock()
-	{
-		return try_lock();
-	}
-
-}; /* class AtomicMutex */
-
-} /* namespace sev */
-
-#endif /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
-
-#endif /* #ifndef SEV_ATOMIC_MUTEX_H */
+#endif /* #ifndef SEV_CONFIG_WIN32_H */
 
 /* end of file */

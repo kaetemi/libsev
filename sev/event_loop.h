@@ -48,33 +48,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #	include "atomic_mutex.h"
 #endif
 
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-#	define WIN32_LEAN_AND_MEAN
-#	include <Windows.h>
+#ifdef WIN32
+typedef void *HANDLE;
 #endif
 
 namespace sev {
+
+/*
+struct EventLoopOptions
+{
+	bool EnableFibers = true;
+	bool EnableTimers = true;
+	bool EnableIO = true;
+}
+*/
 
 typedef std::function<void()> EventFunction;
 
 class SEV_LIB EventLoop
 {
 public:
-	EventLoop() : m_Running(false), m_Cancel(false)
-	{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-		m_PokeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-#endif
-	}
-
-	~EventLoop()
-	{
-		stop();
-		clear();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-		CloseHandle(m_PokeEvent);
-#endif
-	}
+	EventLoop();
+	virtual ~EventLoop();
 
 	void run()
 	{
@@ -251,120 +246,8 @@ public:
 	}
 
 private:
-	void loop()
-	{
-		while (m_Running)
-		{
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-			m_Poked = false;
-#endif
-
-			for (;;)
-			{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
-				EventFunction f;
-				if (!m_ImmediateConcurrent.try_pop(f))
-					break;
-#else
-				m_QueueLock.lock();
-				if (!m_Immediate.size())
-				{
-					m_QueueLock.unlock();
-					break;
-				}
-				EventFunction f = m_Immediate.front();
-				m_Immediate.pop();
-				m_QueueLock.unlock();
-#endif
-				f();
-			}
-
-			bool poked = false;
-			for (;;)
-			{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
-				timeout_func tf;
-				if (!m_TimeoutConcurrent.try_pop(tf))
-					break;
-				const timeout_func &tfr = tf;
-#else
-				m_QueueTimeoutLock.lock();
-				if (!m_Timeout.size())
-				{
-					m_QueueTimeoutLock.unlock();
-					break;
-				}
-				const timeout_func &tfr = m_Timeout.top();
-#endif
-				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-				DWORD wt = (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(tfr.time - now).count();
-				if (tfr.time > now && wt > 0)
-#else
-				if (tfr.time > now) // wait
-#endif
-				{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
-					m_TimeoutConcurrent.push(tf);
-#else
-					m_QueueTimeoutLock.unlock();
-#endif
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-					WaitForSingleObject(m_PokeEvent, wt);
-#else
-					; {
-						std::unique_lock<std::mutex> lock(m_PokeLock);
-						if (!m_Poked)
-							m_PokeCond.wait_until(lock, tfr.time);
-					}
-#endif
-					poked = true;
-					break;
-				}
-#ifndef SEV_DEPEND_MSVC_CONCURRENT
-				timeout_func tf = tfr;
-				m_Timeout.pop();
-				m_QueueTimeoutLock.unlock();
-#endif
-				m_Cancel = false;
-				tf.f(); // call
-				if (!m_Cancel && (tf.interval > std::chrono::nanoseconds::zero())) // repeat
-				{
-					tf.time += tf.interval;
-					; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
-						m_TimeoutConcurrent.push(std::move(tf));
-#else
-						std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
-						m_Timeout.push(std::move(tf));
-#endif
-					}
-				}
-			}
-
-			if (!poked)
-			{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-				WaitForSingleObject(m_PokeEvent, INFINITE);
-#else
-				std::unique_lock<std::mutex> lock(m_PokeLock);
-				if (!m_Poked)
-					m_PokeCond.wait(lock);
-#endif
-			}
-		}
-	}
-
-	void poke() // private
-	{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-		SetEvent(m_PokeEvent);
-#else
-		std::unique_lock<std::mutex> lock(m_PokeLock);
-		m_PokeCond.notify_one();
-		m_Poked = true;
-#endif
-	}
+	void loop();
+	void poke();
 
 private:
 	struct timeout_func
@@ -410,6 +293,6 @@ private:
 
 #endif /* #ifdef SEV_MODULE_EVENT_LOOP */
 
-#endif /* SEV_EVENT_LOOP_H */
+#endif /* #ifndef SEV_EVENT_LOOP_H */
 
 /* end of file */

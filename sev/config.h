@@ -117,6 +117,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ///////////////////////////////////////////////////////////////////////
 
-#endif /* SEV_CONFIG_H */
+#endif /* #ifndef SEV_CONFIG_H */
 
 /* end of file */
