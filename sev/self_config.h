@@ -26,11 +26,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_CONFIG_H
-#define SEV_CONFIG_H
+#ifndef SEV_SELF_CONFIG_H
+#define SEV_SELF_CONFIG_H
+
+///////////////////////////////////////////////////////////////////////
+// Validate platform
+///////////////////////////////////////////////////////////////////////
+
+#if defined(_MSC_VER) && (!defined(_MSVC_LANG) || _MSVC_LANG < 201703L)
+static_assert(false, "C++17 is required");
+#endif
 
 ///////////////////////////////////////////////////////////////////////
 // Standard libraries
+// Any #define can safely be disabled as needed for testing
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
@@ -49,6 +58,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ///////////////////////////////////////////////////////////////////////
 // Module support selection
+// Any #define can safely be disabled as needed for testing
 ///////////////////////////////////////////////////////////////////////
 
 #define SEV_MODULE_ATOMIC_MUTEX
@@ -56,6 +66,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_MODULE_EVENT_LOOP
 
 #define SEV_MODULE_SINGLETON
+
+#define SEV_MODULE_RING_BUFFER
 
 #if defined(SEV_MODULE_EVENT_LOOP) && defined(SEV_DEPEND_WIN32_FIBER)
 #	define SEV_MODULE_EVENTLOOP_FIBER
@@ -92,10 +104,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Magic
 ///////////////////////////////////////////////////////////////////////
 
-#ifdef NULL
-#	undef NULL
-#endif
-#define NULL nullptr
+#define null nullptr
 
 #if defined(_DEBUG) && !defined(NDEBUG)
 #	define SEV_DEBUG
@@ -115,8 +124,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_DEBUG_BREAK() __builtin_trap()
 #endif
 
+#if defined(_DEBUG) && !defined(NDEBUG)
+#	define SEV_ASSERT(cond) do { if (!cond) SEV_DEBUG_BREAK(); } while (false)
+#else
+#	define SEV_ASSERT(cond) do { } while (false)
+#endif
+
 ///////////////////////////////////////////////////////////////////////
 
-#endif /* #ifndef SEV_CONFIG_H */
+#endif /* #ifndef SEV_SELF_CONFIG_H */
 
 /* end of file */

@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_I_STREAM_H
 #define SEV_I_STREAM_H
 
-#include "config.h"
+#include "self_config.h"
 #ifdef SEV_MODULE_STREAM
 
 namespace sev {

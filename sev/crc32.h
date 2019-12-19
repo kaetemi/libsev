@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_CRC32_H
 #define SEV_CRC32_H
 
-#include "config.h"
+#include "self_config.h"
 
 #include <string>
 #include <cstring>

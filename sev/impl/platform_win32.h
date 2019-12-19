@@ -29,15 +29,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_CONFIG_WIN32_H
 #define SEV_CONFIG_WIN32_H
 
-#include "../config.h"
+#include "../self_config.h"
 
 #ifdef WIN32
 
-#define NOMINMAX
-#define NTDDI_VERSION 0x06000000 /* NTDDI_VISTA */
-#define _WIN32_WINNT 0x0600 /* _WIN32_WINNT_VISTA */
-#define WINVER 0x0600 /* _WIN32_WINNT_VISTA */
 #define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0600
+#define NOMINMAX
+#include <malloc.h>
+#include <algorithm>
+using std::max;
+using std::min;
 #include <Windows.h>
 
 #endif /* #ifdef WIN32 */

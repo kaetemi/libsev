@@ -42,8 +42,8 @@ IStreamWriter::IStreamWriter(EventFiber *ef, IStream *stream, size_t buffer)
 }
 
 IStreamWriter::IStreamWriter(char *buffer, size_t index, size_t length)
-	: m_EventFiber(NULL),
-	m_Stream(NULL),
+	: m_EventFiber(null),
+	m_Stream(null),
 	m_Buffer(buffer),
 	m_Index(index), m_Length(length),
 	m_WriteError(false)
@@ -52,8 +52,8 @@ IStreamWriter::IStreamWriter(char *buffer, size_t index, size_t length)
 }
 
 IStreamWriter::IStreamWriter(std::shared_ptr<char> buffer, size_t index, size_t length)
-	: m_EventFiber(NULL),
-	m_Stream(NULL),
+	: m_EventFiber(null),
+	m_Stream(null),
 	m_SharedBuffer(buffer), m_Buffer(buffer.get()),
 	m_Index(index), m_Length(length),
 	m_WriteError(false)

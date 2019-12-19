@@ -31,6 +31,9 @@ ENDIF ()
 ########################################################################
 # Set up the basic build environment
 
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 IF (CMAKE_BUILD_TYPE STREQUAL "")
 	# CMake defaults to leaving CMAKE_BUILD_TYPE empty. This messes up
 	# differentiation between debug and release builds.

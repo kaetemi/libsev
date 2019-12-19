@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_SHARED_SINGLETON_H
 #define SEV_SHARED_SINGLETON_H
 
-#include "config.h"
+#include "self_config.h"
 #ifdef SEV_MODULE_SINGLETON
 
 #include "atomic_shared_mutex.h"

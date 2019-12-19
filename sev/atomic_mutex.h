@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_ATOMIC_MUTEX_H
 #define SEV_ATOMIC_MUTEX_H
 
-#include "config.h"
+#include "self_config.h"
 #ifdef SEV_MODULE_ATOMIC_MUTEX
 
 #include <atomic>

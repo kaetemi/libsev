@@ -42,8 +42,8 @@ IStreamReader::IStreamReader(EventFiber *ef, IStream *stream, size_t buffer)
 }
 
 IStreamReader::IStreamReader(const char *buffer, size_t index, size_t length)
-	: m_EventFiber(NULL),
-	m_Stream(NULL),
+	: m_EventFiber(null),
+	m_Stream(null),
 	m_Buffer(buffer),
 	m_Index(index), m_Length(length),
 	m_ReadError(false)
@@ -52,8 +52,8 @@ IStreamReader::IStreamReader(const char *buffer, size_t index, size_t length)
 }
 
 IStreamReader::IStreamReader(std::shared_ptr<const char> buffer, size_t index, size_t length)
-	: m_EventFiber(NULL),
-	m_Stream(NULL),
+	: m_EventFiber(null),
+	m_Stream(null),
 	m_SharedBuffer(buffer), m_Buffer(buffer.get()),
 	m_Index(index), m_Length(length),
 	m_ReadError(false)
@@ -105,7 +105,7 @@ namespace /* anonymous */ {
 
 void test()
 {
-	IStreamReader *sr = NULL;
+	IStreamReader *sr = null;
 	std::pair<std::string, int> v1 = sr->readPair<std::string, int>();
 	std::pair<std::pair<std::string, int>, int> v2 = sr->readPair<std::pair<std::string, int>, int>();
 }
