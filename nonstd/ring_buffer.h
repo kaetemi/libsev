@@ -27,30 +27,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_RING_BUFFER_H
-#define SEV_RING_BUFFER_H
+#ifndef NONSTD_RING_BUFFER_H
+#define NONSTD_RING_BUFFER_H
 
-#include "self_config.h"
-#ifdef SEV_MODULE_RING_BUFFER
+#ifndef NONSTD_SUPPRESS
 
 #include <memory>
 
-namespace sev {
+namespace nonstd {
 
 /**
 Ring buffer. It's a queue, but using a contiguous memory space.
 Automatically increases capacity as needed.
-Does not decrease capacity automatically. No function is provided to shrink.
+Does not decrease capacity automatically. No function is provided to shrink (yet).
 */
 template<class T, class TAlloc = std::allocator<T>>
-class RingBuffer
+class ring_buffer
 {
 public:
-	RingBuffer(size_t capacity = 1024) 
-		: m_CapacityMask(capacity - 1)
-		, m_WriteIdx(0)
-		, m_ReadIdx(0)
-		, m_Buffer(TAlloc().allocate(capacity))
+	ring_buffer(size_t capacity = 1024) 
+		: capacity_mask_(capacity - 1)
+		, write_idx_(0)
+		, read_idx_(0)
+		, buffer_(TAlloc().allocate(capacity))
 	{
 		// Ensure the capacity is a power of two
 		SEV_ASSERT(!((capacity - 1) & capacity));
@@ -60,117 +59,122 @@ public:
 		SEV_ASSERT(capacity >= 4);
 	}
 
-	RingBuffer(const RingBuffer &other)
-		: m_CapacityMask(other.m_CapacityMask)
-		, m_WriteIdx(other.m_WriteIdx)
-		, m_ReadIdx(other.m_ReadIdx)
-		, m_Buffer(TAlloc().allocate(m_CapacityMask + 1))
+	ring_buffer(const ring_buffer &other)
+		: capacity_mask_(other.capacity_mask_)
+		, write_idx_(other.write_idx_)
+		, read_idx_(other.read_idx_)
+		, buffer_(TAlloc().allocate(capacity_mask_ + 1))
 	{
 		// Ensure the capacity is a power of two
-		const size_t capacity = m_CapacityMask + 1;
+		const size_t capacity = capacity_mask_ + 1;
 		SEV_ASSERT(!((capacity - 1) & capacity));
-		SEV_ASSERT(other.m_Buffer);
+		SEV_ASSERT(other.buffer_);
 
 		// Copy
-		const size_t mask = m_CapacityMask;
-		const size_t ri = m_ReadIdx;
-		const size_t range = (m_WriteIdx - ri) & mask;
+		const size_t mask = capacity_mask_;
+		const size_t ri = read_idx_;
+		const size_t range = (write_idx_ - ri) & mask;
 		TAlloc a;
 		for (size_t i = 0; i < range; ++i)
 		{
-			std::allocator_traits<TAlloc>::construct(a, &m_Buffer[(ri + i) & mask], other.m_Buffer[(ri + i) & mask]);
+			std::allocator_traits<TAlloc>::construct(a, &buffer_[(ri + i) & mask], other.buffer_[(ri + i) & mask]);
 		}
 	}
 
-	RingBuffer(RingBuffer &&other)
-		: m_CapacityMask(other.m_CapacityMask)
-		, m_WriteIdx(other.m_WriteIdx)
-		, m_ReadIdx(other.m_ReadIdx)
-		, m_Buffer(other.m_Buffer)
+	ring_buffer(ring_buffer &&other)
+		: capacity_mask_(other.capacity_mask_)
+		, write_idx_(other.write_idx_)
+		, read_idx_(other.read_idx_)
+		, buffer_(other.buffer_)
 	{
 		// Ensure the capacity is a power of two
-		const size_t capacity = m_CapacityMask + 1;
+		const size_t capacity = capacity_mask_ + 1;
 		SEV_ASSERT(!((capacity - 1) & capacity));
 
 		// Clear other after move
-		other.m_Buffer = null;
+		other.buffer_ = null;
 	}
 
-	~RingBuffer()
+	~ring_buffer()
 	{
-		if (!m_Buffer) // After move
+		if (!buffer_) // After move
 			return;
 
 		TAlloc a;
-		const size_t capacity = m_CapacityMask + 1;
+		const size_t capacity = capacity_mask_ + 1;
 		SEV_ASSERT(!((capacity - 1) & capacity));
-		const size_t mask = m_CapacityMask;
-		const size_t ri = m_ReadIdx;
-		const size_t range = (m_WriteIdx - ri) & mask;
+		const size_t mask = capacity_mask_;
+		const size_t ri = read_idx_;
+		const size_t range = (write_idx_ - ri) & mask;
 		for (size_t i = 0; i < range; ++i)
 		{
-			std::allocator_traits<TAlloc>::destroy(a, &m_Buffer[(ri + i) & mask]);
+			std::allocator_traits<TAlloc>::destroy(a, &buffer_[(ri + i) & mask]);
 		}
-		a.deallocate(m_Buffer, capacity);
+		a.deallocate(buffer_, capacity);
 #ifndef NDEBUG
-		m_Buffer = null;
+		buffer_ = null;
 #endif
 	}
 
-	inline void push_back(T &&value)
+	void push_back(T &&value)
 	{
-		pushBack(std::move(value));
-	}
-
-	void pushBack(T &&value)
-	{
-		size_t wi = m_WriteIdx;
-		size_t mask = m_CapacityMask;
+		size_t wi = write_idx_;
+		size_t mask = capacity_mask_;
 		{
-			const size_t ri = m_ReadIdx;
+			const size_t ri = read_idx_;
 			const size_t space = (ri - wi - 1) & mask;
 			if (space == 0)
 			{
 				expand();
-				wi = m_WriteIdx;
-				mask = m_CapacityMask;
+				wi = write_idx_;
+				mask = capacity_mask_;
 			}
 		}
 		TAlloc a;
-		std::allocator_traits<TAlloc>::construct(a, &m_Buffer[wi], std::move(value));
-		m_WriteIdx = (wi + 1) & mask;
+		std::allocator_traits<TAlloc>::construct(a, &buffer_[wi], std::move(value));
+		write_idx_ = (wi + 1) & mask;
 	}
-	
+
+	T pop_front()
+	{
+		const size_t ri = read_idx_;
+		const size_t mask = capacity_mask_;
+		SEV_ASSERT(write_idx_ != ri);
+		read_idx_ = (ri + 1) & mask;
+		scoped_destroy_ later(buffer_[ri]);
+		return std::move(buffer_[ri]);
+	}
+
+	bool try_pop(T &value)
+	{
+		if (size())
+		{
+			value = std::move(pop_front());
+			return true;
+		}
+		return false;
+	}
+
+	T back()
+	{
+		return buffer_[write_idx_ - 1];
+	}
+
 	T front()
 	{
-		return m_Buffer[ri];
-	}
-
-	inline void pop_front()
-	{
-		popFront();
-	}
-
-	T popFront()
-	{
-		const size_t ri = m_ReadIdx;
-		const size_t mask = m_CapacityMask;
-		SEV_ASSERT(m_WriteIdx != ri);
-		m_ReadIdx = (ri + 1) & mask;
-		ScopedDestroy later(m_Buffer[ri]);
-		return std::move(m_Buffer[ri]);
+		return buffer_[read_idx_];
 	}
 
 	inline size_t capacity()
 	{
-		const size_t capacity = m_CapacityMask + 1;
+		const size_t capacity = capacity_mask_ + 1;
 		SEV_ASSERT(!((capacity - 1) & capacity));
 		return capacity;
 	}
 
 	inline size_t size()
 	{
-		const size_t range = (m_WriteIdx - m_ReadIdx) & m_CapacityMask;
+		const size_t range = (write_idx_ - read_idx_) & capacity_mask_;
 		return range;
 	}
 
@@ -178,77 +182,87 @@ private:
 	void expand()
 	{
 		// Expand the buffer
-		const size_t mask = m_CapacityMask;
-		const size_t ri = m_ReadIdx;
-		const size_t wi = m_WriteIdx;
-		const size_t capacity = (m_CapacityMask + 1);
+		const size_t mask = capacity_mask_;
+		const size_t ri = read_idx_;
+		const size_t wi = write_idx_;
+		const size_t capacity = (capacity_mask_ + 1);
 		const size_t newCapacity = capacity * 2;
 		const size_t newMask = newCapacity - 1;
 		TAlloc a;
 		SEV_ASSERT(!((capacity - 1) & capacity)); // Pow2
 		SEV_ASSERT(!((newCapacity - 1) & capacity));
-		T *buffer = m_Buffer;
+		T *buffer = buffer_;
 		T *newBuffer = a.allocate(newCapacity);
-		const size_t range = (wi - m_ReadIdx) & mask;
+		const size_t range = (wi - read_idx_) & mask;
 		for (size_t i = 0; i < range; ++i)
 		{
 			std::allocator_traits<TAlloc>::construct(a, &newBuffer[(ri + i) & newMask], std::move(buffer[(ri + i) & mask]));
 			std::allocator_traits<TAlloc>::destroy(a, &buffer[(ri + i) & mask]);
 		}
-		m_Buffer = newBuffer;
-		m_CapacityMask = newMask;
+		buffer_ = newBuffer;
+		capacity_mask_ = newMask;
 		if (wi < ri)
 		{
 			const size_t newWi = wi + capacity;
 			SEV_ASSERT(newWi < newCapacity);
-			m_WriteIdx = newWi;
+			write_idx_ = newWi;
 		}
 		a.deallocate(buffer, capacity);
 	}
 
-	struct ScopedDestroy
+	struct scoped_destroy_
 	{
 	public:
-		ScopedDestroy(T &value) : m_Value(value) { }
-		~ScopedDestroy() { TAlloc a; std::allocator_traits<TAlloc>::destroy(a, &m_Value); }
+		scoped_destroy_(T &value) : value_(value) { }
+		~scoped_destroy_() { TAlloc a; std::allocator_traits<TAlloc>::destroy(a, &value_); }
 	private:
-		T &m_Value;
+		T &value_;
 	};
 
 private:
-	T *m_Buffer;
-	size_t m_CapacityMask;
-	size_t m_WriteIdx;
-	size_t m_ReadIdx;
+	T *buffer_;
+	size_t capacity_mask_;
+	size_t write_idx_;
+	size_t read_idx_;
 
-}; /* class RingBuffer */
+}; /* class ring_buffer */
 
-} /* namespace sev */
+} /* namespace nonstd */
 
-#else /* #ifdef SEV_MODULE_RING_BUFFER */
+#else /* #ifndef NONSTD_SUPPRESS */
 
 template<class T, class TAlloc>
-class RingBuffer : public std::queue<T, TAlloc>
+class ring_buffer : public std::queue<T, TAlloc>
 {
 public:
-	inline void pushBack(T &&value)
+	inline void push_back(T &&value)
 	{
 		push_back(value);
 	}
-	
-	inline T popFront()
+
+	inline T pop_front()
 	{
 		T value = front();
-		pop_front();
+		std::queue<T, TAlloc>::pop_front();
 		return value;
 	}
 
-}; /* class RingBuffer */
+	bool try_pop(T &value)
+	{
+		if (size())
+		{
+			value = std::move(pop_front());
+			return true;
+		}
+		return false;
+	}
 
-} /* namespace sev */
+}; /* class ring_buffer */
 
-#endif /* #ifdef SEV_MODULE_RING_BUFFER */
+} /* namespace nonstd */
 
-#endif /* #ifndef SEV_RING_BUFFER_H */
+#endif /* #ifndef NONSTD_SUPPRESS */
+
+#endif /* #ifndef NONSTD_RING_BUFFER_H */
 
 /* end of file */
