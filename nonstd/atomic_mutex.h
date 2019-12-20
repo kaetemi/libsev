@@ -1,17 +1,18 @@
 /*
 
-Copyright (C) 2016-2017  by authors
-Author: Jan Boon <jan.boon@kaetemi.be>
+Copyright (C) 2019  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
-* Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -26,30 +27,31 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef SEV_ATOMIC_MUTEX_H
-#define SEV_ATOMIC_MUTEX_H
+#ifndef NONSTD_ATOMIC_MUTEX_H
+#define NONSTD_ATOMIC_MUTEX_H
 
-#include "self_config.h"
-#ifdef SEV_MODULE_ATOMIC_MUTEX
+#ifndef NONSTD_SUPPRESS
 
 #include <atomic>
 #include <thread>
 
-namespace sev {
+#include "debug_break.h"
 
-class SEV_LIB AtomicMutex
+namespace nonstd {
+
+class atomic_mutex
 {
 public:
-	inline AtomicMutex()
+	inline atomic_mutex()
 	{
 		m_Atomic.clear();
 	}
 
 #ifdef SEV_DEBUG
-	inline ~AtomicMutex()
+	inline ~atomic_mutex()
 	{
 		if (!tryLock())
-			SEV_DEBUG_BREAK(); // Must be unlocked before destroying
+			debug_break(); // Must be unlocked before destroying
 	}
 #endif
 
@@ -64,11 +66,6 @@ public:
 		return !m_Atomic.test_and_set();
 	}
 
-	inline bool tryLock()
-	{
-		return try_lock();
-	}
-
 	inline void unlock()
 	{
 		m_Atomic.clear();
@@ -78,33 +75,25 @@ private:
 	std::atomic_flag m_Atomic;
 
 private:
-	AtomicMutex &operator=(const AtomicMutex&) = delete;
-	AtomicMutex(const AtomicMutex&) = delete;
+	atomic_mutex &operator=(const atomic_mutex&) = delete;
+	atomic_mutex(const atomic_mutex&) = delete;
 
-}; /* class AtomicMutex */
+}; /* class atomic_mutex */
 
-} /* namespace sev */
+} /* namespace nonstd */
 
-#else /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
+#else /* #ifndef NONSTD_SUPPRESS */
 
 #include <mutex>
 
-namespace sev {
+namespace nonstd {
 
-class SEV_LIB AtomicMutex : public std::mutex
-{
-public:
-	inline bool tryLock()
-	{
-		return try_lock();
-	}
+using atomic_mutex = std::mutex;
 
-}; /* class AtomicMutex */
+} /* namespace nonstd */
 
-} /* namespace sev */
+#endif /* #ifndef NONSTD_SUPPRESS */
 
-#endif /* #ifdef SEV_MODULE_ATOMIC_MUTEX */
-
-#endif /* #ifndef SEV_ATOMIC_MUTEX_H */
+#endif /* #ifndef NONSTD_ATOMIC_MUTEX_H */
 
 /* end of file */
