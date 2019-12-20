@@ -75,9 +75,10 @@ public:
 		const size_t mask = m_CapacityMask;
 		const size_t ri = m_ReadIdx;
 		const size_t range = (m_WriteIdx - ri) & mask;
+		TAlloc a;
 		for (size_t i = 0; i < range; ++i)
 		{
-			std::allocator_traits<TAlloc>::construct(TAlloc(), &m_Buffer[(ri + i) & mask], other.m_Buffer[(ri + i) & mask]);
+			std::allocator_traits<TAlloc>::construct(a, &m_Buffer[(ri + i) & mask], other.m_Buffer[(ri + i) & mask]);
 		}
 	}
 
