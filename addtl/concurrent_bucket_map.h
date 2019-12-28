@@ -57,20 +57,27 @@ Index size is the number of bits to use for indexing at each bucket depth level.
 
 TODO: Match concurrent_map interface, set as alternative implementation for testing.
 
+It's possible to implement an std::vector-like container on top of this, effectively allocating values in sequence.
+
 \author Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 
 */
-template<class TKey, class TValue, size_t tIndexSizeBits = 8>
+template<class TKey, class TValue, size_t tIndexSizeBits = 8, size_t tKeyBits = (sizeof(TKey) * 8), size_t tDepth = ((key_bits + (index_size_bits - 1)) / index_size_bits)>
 class concurrent_bucket_map
 {
 public:
 	using key_t = TKey;
 	using value_t = TValue;
 
+	static constexpr size_t key_bits = tKeyBits;
 	static constexpr size_t index_size_bits = tIndexSizeBits; // 8 bits index per bucket level
-	static constexpr size_t bucket_depth = ((sizeof(TKey) * 8) + (index_size_bits - 1)) / index_size_bits; // 2, 4, or 8 bytes
+	static constexpr size_t bucket_depth = tDepth; // 2, 4, or 8 bytes
 	static constexpr size_t bucket_size = 1ULL << index_size_bits;
 	static constexpr size_t bucket_mask = bucket_size - 1;
+	
+	static constexpr size_t root_index_size_bits = key_bits - (index_size_bits * (bucket_depth - 1));
+	static constexpr size_t root_bucket_size = 1ULL << root_index_size_bits;
+	static constexpr size_t root_bucket_mask = root_bucket_size - 1;
 	
 private:
 	using data_t_ = TValue;
@@ -79,8 +86,8 @@ public:
 	inline concurrent_bucket_map()
 	{
 		static_assert(bucket_depth >= 2, "Lower depth is useless!");
-		buckets_ = static_cast<void *>(new void *[bucket_size]);
-		memset(buckets_, 0, sizeof(void *) * bucket_size);
+		buckets_ = static_cast<void *>(new void *[root_bucket_size]);
+		memset(buckets_, 0, sizeof(void *) * root_bucket_size);
 	}
 	
 	inline ~concurrent_bucket_map()
@@ -97,7 +104,7 @@ public:
 			uint16_t k = key;
 			data_t_ **d = static_cast<data_t_**>(buckets_);
 			return d
-				[(key >> 8) & bucket_mask]
+				[(key >> 8) & root_bucket_mask]
 				[key & bucket_mask];
 		}
 		else if (index_size_bits == 8 && bucket_depth == 4)
@@ -105,7 +112,7 @@ public:
 			uint32_t k = key;
 			data_t_ ****d = static_cast<data_t_****>(buckets_);
 			return d
-				[(key >> 24) & bucket_mask]
+				[(key >> 24) & root_bucket_mask]
 				[(key >> 16) & bucket_mask]
 				[(key >> 8) & bucket_mask]
 				[key & bucket_mask];
@@ -115,7 +122,7 @@ public:
 			uint64_t k = key;
 			data_t_ ********d = static_cast<data_t_********>(buckets_);
 			return d
-				[(key >> 56) & bucket_mask]
+				[(key >> 56) & root_bucket_mask]
 				[(key >> 48) & bucket_mask]
 				[(key >> 40) & bucket_mask]
 				[(key >> 32) & bucket_mask]
@@ -211,7 +218,7 @@ private:
 		{
 			uint16_t k = key & 0xFFFF;
 			data_t_ **d1 = static_cast<data_t_**>(buckets_);
-			data_t_ *d0 = d1[(k >> 8) & bucket_mask];
+			data_t_ *d0 = d1[(k >> 8) & root_bucket_mask];
 			if (!d0) return nullptr;
 			return &d0[k & bucket_mask];
 		}
@@ -219,7 +226,7 @@ private:
 		{
 			uint32_t k = key & 0xFFFFFFFF;
 			data_t_ ****d3 = static_cast<data_t_****>(buckets_);
-			data_t_ ***d2 = d3[(k >> 24) & bucket_mask];
+			data_t_ ***d2 = d3[(k >> 24) & root_bucket_mask];
 			if (!d2) return nullptr;
 			data_t_ **d1 = d2[(k >> 16) & bucket_mask];
 			if (!d1) return nullptr;
@@ -231,7 +238,7 @@ private:
 		{
 			uint64_t k = key;
 			data_t_ ********d7 = static_cast<data_t_********>(buckets_);
-			data_t_ *******d6 = d7[(k >> 56) & bucket_mask];
+			data_t_ *******d6 = d7[(k >> 56) & root_bucket_mask];
 			if (!d6) return nullptr;
 			data_t_ ******d5 = d6[(k >> 48) & bucket_mask];
 			if (!d5) return nullptr;
@@ -257,7 +264,7 @@ private:
 	inline data_t_ *find_bucket_(uint64_t key, void *buckets, size_t depth)
 	{
 		size_t next_depth = depth + 1;
-		size_t i = (key >> (index_size_bits * (bucket_depth - next_depth))) & bucket_mask;
+		size_t i = (key >> (index_size_bits * (bucket_depth - next_depth))) & (depth ? bucket_mask : root_bucket_mask);
 		if (next_depth < bucket_depth)
 		{
 			void **b = static_cast<void **>(buckets);
@@ -278,7 +285,7 @@ private:
 		{
 			uint16_t k = key & 0xFFFF;
 			data_t_ **d1 = static_cast<data_t_**>(buckets_);
-			data_t_ *d0 = d1[(k >> 8) & bucket_mask];
+			data_t_ *d0 = d1[(k >> 8) & root_bucket_mask];
 			if (!d0) return make_bucket_(key, d1, 0);
 			return d0[k & bucket_mask];
 		}
@@ -286,7 +293,7 @@ private:
 		{
 			uint32_t k = key & 0xFFFFFFFF;
 			data_t_ ****d3 = static_cast<data_t_****>(buckets_);
-			data_t_ ***d2 = d3[(k >> 24) & bucket_mask];
+			data_t_ ***d2 = d3[(k >> 24) & root_bucket_mask];
 			if (!d2) return make_bucket_(key, d3, 0);
 			data_t_ **d1 = d2[(k >> 16) & bucket_mask];
 			if (!d1) return make_bucket_(key, d2, 1);
@@ -298,7 +305,7 @@ private:
 		{
 			uint64_t k = key;
 			data_t_ ********d7 = static_cast<data_t_********>(buckets_);
-			data_t_ *******d6 = d7[(k >> 56) & bucket_mask];
+			data_t_ *******d6 = d7[(k >> 56) & root_bucket_mask];
 			if (!d6) return make_bucket_(key, d7, 0);
 			data_t_ ******d5 = d6[(k >> 48) & bucket_mask];
 			if (!d5) return make_bucket_(key, d6, 1);
@@ -324,7 +331,7 @@ private:
 	data_t_ &make_bucket_(uint64_t key, void *buckets, size_t depth)
 	{
 		size_t next_depth = depth + 1;
-		size_t i = (key >> (index_size_bits * (bucket_depth - next_depth))) & bucket_mask;
+		size_t i = (key >> (index_size_bits * (bucket_depth - next_depth))) & (depth ? bucket_mask : root_bucket_mask);
 		if (next_depth < bucket_depth)
 		{
 			void **b = static_cast<void **>(buckets);
