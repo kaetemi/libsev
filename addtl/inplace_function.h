@@ -26,7 +26,7 @@
 
 #pragma once
 
-#ifndef NONSTD_SUPPRESS
+#ifndef ADDTL_SUPPRESS
 
 #include <type_traits>
 #include <utility>
@@ -36,7 +36,7 @@
 #define SG14_INPLACE_FUNCTION_THROW(x) throw (x)
 #endif
 
-namespace nonstd {
+namespace addtl {
 
 namespace inplace_function_detail {
 
@@ -381,13 +381,13 @@ private:
     }
 };
 
-} // namespace nonstd
+} // namespace addtl
 
-#else /* #ifndef NONSTD_SUPPRESS */
+#else /* #ifndef ADDTL_SUPPRESS */
 
 #include <functional>
 
-namespace nonstd {
+namespace addtl {
 
 template<
     class Signature,
@@ -396,8 +396,8 @@ template<
 >
 using inplace_function = std::function<Signature>;
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-#endif /* #ifndef NONSTD_SUPPRESS */
+#endif /* #ifndef ADDTL_SUPPRESS */
 
 /* end of file */

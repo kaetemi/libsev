@@ -27,14 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef NONSTD_SHARED_SINGLETON_H
-#define NONSTD_SHARED_SINGLETON_H
+#ifndef ADDTL_SHARED_SINGLETON_H
+#define ADDTL_SHARED_SINGLETON_H
 
-// #ifndef NONSTD_SUPPRESS
+// #ifndef ADDTL_SUPPRESS
 
 #include "atomic_shared_mutex.h"
 
-namespace nonstd {
+namespace addtl {
 
 //! Purpose is to have a singleton which is reference counted, so it gets destroyed when no longer in use
 template<class TClass>
@@ -159,10 +159,10 @@ private:
 template <typename TClass>
 typename shared_singleton<TClass>::singleton_static_ shared_singleton<TClass>::s_singleton_static_;
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-// #endif /* #ifndef NONSTD_SUPPRESS */
+// #endif /* #ifndef ADDTL_SUPPRESS */
 
-#endif /* NONSTD_SHARED_SINGLETON_H */
+#endif /* ADDTL_SHARED_SINGLETON_H */
 
 /* end of file */

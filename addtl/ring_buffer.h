@@ -27,14 +27,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef NONSTD_RING_BUFFER_H
-#define NONSTD_RING_BUFFER_H
+#ifndef ADDTL_RING_BUFFER_H
+#define ADDTL_RING_BUFFER_H
 
-#ifndef NONSTD_SUPPRESS
+#ifndef ADDTL_SUPPRESS
 
 #include <memory>
 
-namespace nonstd {
+namespace addtl {
 
 /**
 Ring buffer. It's a queue, but using a contiguous memory space.
@@ -227,9 +227,9 @@ private:
 
 }; /* class ring_buffer */
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-#else /* #ifndef NONSTD_SUPPRESS */
+#else /* #ifndef ADDTL_SUPPRESS */
 
 template<class T, class TAlloc>
 class ring_buffer : public std::queue<T, TAlloc>
@@ -259,10 +259,10 @@ public:
 
 }; /* class ring_buffer */
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-#endif /* #ifndef NONSTD_SUPPRESS */
+#endif /* #ifndef ADDTL_SUPPRESS */
 
-#endif /* #ifndef NONSTD_RING_BUFFER_H */
+#endif /* #ifndef ADDTL_RING_BUFFER_H */
 
 /* end of file */

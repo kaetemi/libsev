@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2019  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
+Copyright (C) 2017-2019  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -27,73 +27,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef NONSTD_ATOMIC_MUTEX_H
-#define NONSTD_ATOMIC_MUTEX_H
+#ifndef ADDTL_PLATFORM_WIN32_H
+#define ADDTL_PLATFORM_WIN32_H
 
-#ifndef NONSTD_SUPPRESS
+#ifdef WIN32
 
-#include <atomic>
-#include <thread>
+#define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0600
+#define NOMINMAX
+#include <malloc.h>
+#include <algorithm>
+using std::max;
+using std::min;
+#include <Windows.h>
 
-#include "debug_break.h"
+#endif /* #ifdef WIN32 */
 
-namespace nonstd {
-
-class atomic_mutex
-{
-public:
-	inline atomic_mutex()
-	{
-		m_Atomic.clear();
-	}
-
-#ifdef SEV_DEBUG
-	inline ~atomic_mutex()
-	{
-		if (!tryLock())
-			debug_break(); // Must be unlocked before destroying
-	}
-#endif
-
-	inline void lock()
-	{
-		while (m_Atomic.test_and_set())
-			std::this_thread::yield();
-	}
-
-	inline bool try_lock()
-	{
-		return !m_Atomic.test_and_set();
-	}
-
-	inline void unlock()
-	{
-		m_Atomic.clear();
-	}
-
-private:
-	std::atomic_flag m_Atomic;
-
-private:
-	atomic_mutex &operator=(const atomic_mutex&) = delete;
-	atomic_mutex(const atomic_mutex&) = delete;
-
-}; /* class atomic_mutex */
-
-} /* namespace nonstd */
-
-#else /* #ifndef NONSTD_SUPPRESS */
-
-#include <mutex>
-
-namespace nonstd {
-
-using atomic_mutex = std::mutex;
-
-} /* namespace nonstd */
-
-#endif /* #ifndef NONSTD_SUPPRESS */
-
-#endif /* #ifndef NONSTD_ATOMIC_MUTEX_H */
+#endif /* #ifndef ADDTL_PLATFORM_WIN32_H */
 
 /* end of file */

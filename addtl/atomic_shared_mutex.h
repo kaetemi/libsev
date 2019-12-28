@@ -27,17 +27,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#ifndef NONSTD_ATOMIC_SHARED_MUTEX_H
-#define NONSTD_ATOMIC_SHARED_MUTEX_H
+#ifndef ADDTL_ATOMIC_SHARED_MUTEX_H
+#define ADDTL_ATOMIC_SHARED_MUTEX_H
 
-#ifndef NONSTD_SUPPRESS
+#ifndef ADDTL_SUPPRESS
 
 #include <atomic>
 #include <thread>
 
 #include "debug_break.h"
 
-namespace nonstd {
+namespace addtl {
 
 //! Lock allowing one unique writer and multiple shared readers
 class atomic_shared_mutex
@@ -124,20 +124,20 @@ private:
 
 }; /* class atomic_shared_mutex */
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-#else /* #ifndef NONSTD_SUPPRESS */
+#else /* #ifndef ADDTL_SUPPRESS */
 
 #include <shared_mutex>
 
-namespace nonstd {
+namespace addtl {
 
 using atomic_shared_mutex = std::shared_mutex;
 
-} /* namespace nonstd */
+} /* namespace addtl */
 
-#endif /* #ifndef NONSTD_SUPPRESS */
+#endif /* #ifndef ADDTL_SUPPRESS */
 
-#endif /* NONSTD_ATOMIC_SHARED_MUTEX_H */
+#endif /* ADDTL_ATOMIC_SHARED_MUTEX_H */
 
 /* end of file */
