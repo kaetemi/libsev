@@ -62,7 +62,7 @@ It's possible to implement an std::vector-like container on top of this, effecti
 \author Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 
 */
-template<class TKey, class TValue, size_t tIndexSizeBits = 8, size_t tKeyBits = (sizeof(TKey) * 8), size_t tDepth = ((key_bits + (index_size_bits - 1)) / index_size_bits)>
+template<class TKey, class TValue, size_t tIndexSizeBits = 8, size_t tKeyBits = (sizeof(TKey) * 8), size_t tDepth = ((tKeyBits + (tIndexSizeBits - 1)) / tIndexSizeBits)>
 class concurrent_bucket_map
 {
 public:
