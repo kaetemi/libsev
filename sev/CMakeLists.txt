@@ -1,0 +1,17 @@
+
+FILE(GLOB SRCS *.cpp impl/*.cpp)
+FILE(GLOB HDRS *.h impl/*.h)
+FILE(GLOB INLS *.inl impl/*.inl)
+
+SOURCE_GROUP("" FILES ${SRCS} ${HDRS} ${INLS})
+
+ADD_LIBRARY(sev SHARED
+  ${SRCS}
+  ${HDRS}
+  ${INLS}
+)
+
+TARGET_LINK_LIBRARIES(sev
+)
+
+ADD_DEFINITIONS(-DSEV_CMAKE -DSEV_LIB_EXPORT)

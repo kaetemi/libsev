@@ -55,6 +55,8 @@ LINK_DIRECTORIES(
 )
 INCLUDE_DIRECTORIES(
 	${CMAKE_SOURCE_DIR}
+	${CMAKE_SOURCE_DIR}/dependencies/debugbreak
+	${CMAKE_SOURCE_DIR}/dependencies/gsl/include
 )
 
 ########################################################################
@@ -64,6 +66,8 @@ SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 ########################################################################
+
+ADD_SUBDIRECTORY(dependencies/fmt)
 
 ADD_SUBDIRECTORY(sev)
 ADD_SUBDIRECTORY(sev_static)
