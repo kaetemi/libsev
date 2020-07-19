@@ -1,0 +1,3 @@
+[submodule "dependencies/debugbreak"]
+	path = dependencies/debugbreak
+	url = https://github.com/scottt/debugbreak.git

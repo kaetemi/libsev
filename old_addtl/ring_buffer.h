@@ -37,9 +37,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace addtl {
 
 /**
+
 Ring buffer. It's a queue, but using a contiguous memory space.
 Automatically increases capacity as needed.
 Does not decrease capacity automatically. No function is provided to shrink (yet).
+
+TODO: Create a concurrent variant of this.
+      Acquiring a write accessor increments the reserved pointer,
+      closing the write accessor increments the written pointer.
+      The real write pointer is only updated when both reserved and written are equal.
+      Use concurrent_bucket_map<uint32_t, blob, 16> as a backing storage.
+      Only need a shared lock to lock uniquely when increasing storage... Then concurrent_bucket_map isn't needed anyway.
+
 */
 template<class T, class TAlloc = std::allocator<T>>
 class ring_buffer
