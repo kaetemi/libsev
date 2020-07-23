@@ -92,7 +92,7 @@ using namespace std::string_view_literals;
 #endif
 
 // Include debug_break
-#include <debug_break.h>
+#include <debugbreak.h>
 #define SEV_DEBUG_BREAK() debug_break()
 
 // Assert

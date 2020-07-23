@@ -27,27 +27,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#pragma once
-#ifndef SEV_EVENT_WAIT_HANDLE_H
-#define SEV_EVENT_WAIT_HANDLE_H
+#include "event_flag.h"
 
-#include "platform.h"
 
 namespace sev {
 
-class EventWaitHandle
-{
-public:
-	EventWaitHandle();
-	~EventWaitHandle();
-	
-private:
-	// ...
-	
-};
+// ...
 
 }
-
-#endif /* #ifndef SEV_EVENT_WAIT_HANDLE_H */
 
 /* end of file */

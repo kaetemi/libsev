@@ -27,20 +27,69 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
-#include "event_wait_handle.h"
+/*
+
+Event flag. Thread waits if flag is false, one thread continues when the flag is set.
+Setting the flag multiple times has no effect, only one thread will continue.
+Only one thread is supposed to wait for this flag.
+
+*/
+
+#pragma once
+#ifndef SEV_EVENT_FLAG_H
+#define SEV_EVENT_FLAG_H
+
+#include "platform.h"
+
+#include <atomic>
+#include <condition_variable>
 
 namespace sev {
 
-EventWaitHandle::EventWaitHandle()
+class EventFlag
 {
-	// ...
+public:
+	EventFlag(bool manualReset = false) : m_ResetValue(manualReset)
+	{
+
+	}
+
+	~EventFlag()
+	{
+		// ...
+	}
+
+	void wait()
+	{
+		std::unique_lock<std::mutex> lock(m_Mutex);
+		bool flag = true;
+		while (!m_Flag.compare_exchange_weak(flag, m_ResetValue))
+		{
+			flag = true;
+			m_CondVar.wait(lock);
+		}
+	}
+
+	void notify()
+	{
+		m_Flag = true;
+	}
+
+	void reset()
+	{
+		m_Flag = false;
+	}
+
+private:
+	std::atomic_bool m_Flag;
+	std::condition_variable m_CondVar;
+	std::mutex m_Mutex;
+	bool m_ResetValue;
+
+};
+
 }
 
-EventWaitHandle::~EventWaitHandle()
-{
-	// ...
-}
-
-}
+#endif /* #ifndef SEV_EVENT_FLAG_H */
 
 /* end of file */
