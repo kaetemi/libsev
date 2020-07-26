@@ -32,14 +32,63 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <atomic>
+
+static std::atomic_ptrdiff_t s_AllocationCount;
+
+// Override global C++ allocation for debug purpose
+void *operator new(size_t sz)
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	void *ptr = _aligned_malloc(sz, 32);
+	if (ptr)
+		return ptr;
+	else
+		throw std::bad_alloc{};
+}
+
+void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	return _aligned_malloc(sz, 32);
+}
+
+void operator delete(void *ptr) noexcept
+{
+	// printf("-[[[Free pointer]]]-");
+	_aligned_free(ptr);
+	s_AllocationCount -= 1;
+}
 
 int main()
 {
-	std::cout << sev::Win32Exception(0, 0, __FILE__, __LINE__).what() << "\n";
-	std::cout << sev::Win32Exception(0, ERROR_PATH_NOT_FOUND, __FILE__, __LINE__).what() << "\n";
-	std::cout << sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__).what() << "\n";
+	{
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
 
-	// throw sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__);
+	{
+		std::cout << sev::Win32Exception(0, 0, __FILE__, __LINE__).what() << "\n";
+		std::cout << sev::Win32Exception(0, ERROR_PATH_NOT_FOUND, __FILE__, __LINE__).what() << "\n";
+		std::cout << sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__).what() << "\n";
+
+		// throw sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__);
+	}
+
+	{
+		sev::Win32Exception a(E_OUTOFMEMORY, 0, __FILE__, __LINE__);
+		sev::Win32Exception b(a);
+		sev::Win32Exception c = a;
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
 
 	{
 		sev::EventFlag a;
@@ -146,5 +195,33 @@ int main()
 		std::cout << ".\n"sv;
 	}
 
-	std::cout << "Y\n"sv;
+	{
+		std::cout << "Y\n"sv;
+	}
+
+	{
+		sev::Exception a("Hello world");
+		sev::Exception b(a);
+		sev::Exception c = b;
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		sev::Exception a("Hello world", 1);
+		sev::Exception b(a);
+		sev::Exception c = b;
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
 }

@@ -12,5 +12,7 @@ ADD_EXECUTABLE(test_dev
 )
 
 TARGET_LINK_LIBRARIES(test_dev
-  sev
+  sev_static
 )
+
+ADD_DEFINITIONS(-DSEV_LIB_STATIC)
