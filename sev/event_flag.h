@@ -33,6 +33,9 @@ Event flag. Thread waits if flag is false, one thread continues when the flag is
 Setting the flag multiple times has no effect, only one thread will continue.
 Only one thread is supposed to wait for this flag.
 
+TODO: Support eventfd
+TODO: Move stl stuff into a struct, use by pointer, due to dll boundary
+
 */
 
 #pragma once

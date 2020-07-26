@@ -32,6 +32,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 throw Win32Exception(...);
 catch (Win32Exception &ex) { char *what = ex.what(); ... }
 
+Exception messages are in UTF-8.
+
 */
 
 #pragma once
