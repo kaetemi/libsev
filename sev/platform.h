@@ -80,6 +80,14 @@ constexpr decltype(nullptr) null = nullptr;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
+// A couple of types for the global namespace, for everyone's sanity.
+#if defined(_HAS_CXX20) && _HAS_CXX20
+#include <compare>
+using std::strong_ordering;
+#endif
+using std::move;
+using std::nothrow;
+
 // Include GSL
 // auto _ = gsl::finally([&] { delete xyz; });
 #include "gsl/gsl_util"
@@ -100,6 +108,27 @@ using namespace std::string_view_literals;
 #	define SEV_ASSERT(cond) do { if (!cond) SEV_DEBUG_BREAK(); } while (false)
 #else
 #	define SEV_ASSERT(cond) do { } while (false)
+#endif
+
+// Library export decl
+#ifdef _MSC_VER
+#	define SEV_DECL_EXPORT __declspec(dllexport)
+#	define SEV_DECL_IMPORT __declspec(dllimport)
+#else
+#	define SEV_DECL_EXPORT
+#	define SEV_DECL_IMPORT
+#endif
+
+#if defined(SEV_LIB_EXPORT)
+#ifdef _MSC_VER
+// #pragma warning(disable: 4577)
+// #pragma warning(disable: 4251)
+#endif
+#  define SEV_LIB SEV_DECL_EXPORT
+#elif defined(SEV_LIB_STATIC)
+#  define SEV_LIB
+#else
+#  define SEV_LIB SEV_DECL_IMPORT
 #endif
 
 #endif /* __cplusplus */

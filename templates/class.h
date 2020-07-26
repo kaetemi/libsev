@@ -22,7 +22,7 @@ private:
 
 }
 
-typedef NMSP::ClassName NMSP_ClassName;
+typedef nmsp::ClassName NMSP_ClassName;
 
 #else
 

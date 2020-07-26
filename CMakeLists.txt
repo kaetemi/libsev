@@ -60,8 +60,10 @@ IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 	LINK_DIRECTORIES(
 	)
 	INCLUDE_DIRECTORIES(
-		${CMAKE_SOURCE_DIR}/dependencies/debugbreak
-		${CMAKE_SOURCE_DIR}/dependencies/gsl/include
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/debugbreak
+		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/gsl/include
+		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/fmt/include
 	)
 	
 	########################################################################
@@ -81,5 +83,7 @@ ADD_SUBDIRECTORY(dependencies/fmt)
 ADD_SUBDIRECTORY(sev)
 ADD_SUBDIRECTORY(sev_static)
 ADD_SUBDIRECTORY(sev_lite)
+
+ADD_SUBDIRECTORY(test_dev)
 
 ########################################################################

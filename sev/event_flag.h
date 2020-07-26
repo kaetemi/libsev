@@ -40,27 +40,54 @@ Only one thread is supposed to wait for this flag.
 #define SEV_EVENT_FLAG_H
 
 #include "platform.h"
+#include "win32_exception.h"
 
 #include <atomic>
 #include <condition_variable>
 
+#if !defined(SEV_EVENT_FLAG_WIN32) && !defined(SEV_EVENT_FLAG_STL) && !defined(SEV_EVENT_FLAG_EVENTFD)
+#ifdef _WIN32
+#define SEV_EVENT_FLAG_WIN32
+#else
+#define SEV_EVENT_FLAG_STL
+#endif
+#endif
+
+#ifdef __cplusplus
+
 namespace sev {
 
-class EventFlag
+struct SEV_LIB EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
 {
 public:
-	EventFlag(bool manualReset = false) : m_ResetValue(manualReset)
+	EventFlag(bool manualReset = false, bool initialState = false)
+#ifdef SEV_EVENT_FLAG_WIN32
+		: m_Event(CreateEventW(null, manualReset, manualReset, null))
+#else
+		: m_ResetValue(manualReset), m_Flag(initialState)
+#endif
 	{
-
+#ifdef SEV_EVENT_FLAG_WIN32
+		static_assert(sizeof(EventFlag) == sizeof(HANDLE));
+		if (!m_Event)
+			SEV_THROW_LAST_ERROR();
+#endif
 	}
 
 	~EventFlag()
 	{
-		// ...
+#ifdef SEV_EVENT_FLAG_WIN32
+		CloseHandle(m_Event);
+#endif
 	}
 
 	void wait()
 	{
+#ifdef SEV_EVENT_FLAG_WIN32
+		DWORD res = WaitForSingleObject(m_Event, INFINITE);
+		if (res != WAIT_OBJECT_0)
+			SEV_THROW_LAST_ERROR();
+#else
 		std::unique_lock<std::mutex> lock(m_Mutex);
 		bool flag = true;
 		while (!m_Flag.compare_exchange_weak(flag, m_ResetValue))
@@ -68,27 +95,59 @@ public:
 			flag = true;
 			m_CondVar.wait(lock);
 		}
+#endif
 	}
 
-	void notify()
+	void set()
 	{
+#ifdef SEV_EVENT_FLAG_WIN32
+		if (!SetEvent(m_Event))
+			SEV_THROW_LAST_ERROR();
+#else
+		std::unique_lock<std::mutex> lock(m_Mutex);
 		m_Flag = true;
+		m_CondVar.notify_one();
+#endif
 	}
 
 	void reset()
 	{
+#ifdef SEV_EVENT_FLAG_WIN32
+		if (!ResetEvent(m_Event))
+			SEV_THROW_LAST_ERROR();
+#else
 		m_Flag = false;
+#endif
 	}
 
 private:
-	std::atomic_bool m_Flag;
+#ifdef SEV_EVENT_FLAG_WIN32
+	HANDLE m_Event;
+#else
 	std::condition_variable m_CondVar;
 	std::mutex m_Mutex;
 	bool m_ResetValue;
+	std::atomic_bool m_Flag;
+#endif
 
 };
 
 }
+
+#ifdef SEV_EVENT_FLAG_WIN32
+typedef HANDLE SEV_EventFlag;
+#else
+typedef sev::EventFlag *SEV_EventFlag;
+#endif
+
+#else
+
+typedef void SEV_EventFlag;
+
+#endif
+
+SEV_EventFlag SEV_EventFlag_create();
+void SEV_EventFlag_destroy(SEV_EventFlag eventFlag);
 
 #endif /* #ifndef SEV_EVENT_FLAG_H */
 
