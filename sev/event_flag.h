@@ -74,7 +74,7 @@ struct EventFlagImpl;
 struct SEV_LIB EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
 {
 public:
-	EventFlag(bool manualReset = false, bool initialState = false)
+	inline EventFlag(bool manualReset = false, bool initialState = false)
 #ifdef SEV_EVENT_FLAG_WIN32
 		: m_Event(CreateEventW(null, manualReset, manualReset, null))
 #else
@@ -91,21 +91,55 @@ public:
 #endif
 	}
 
-	~EventFlag()
+	inline ~EventFlag()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
-		CloseHandle(m_Event);
+		HANDLE hEvent = m_Event;
+		if (hEvent != INVALID_HANDLE_VALUE)
+		{
+			m_Event = INVALID_HANDLE_VALUE;
+			SetEvent(hEvent);
+			SwitchToThread(); // No guarantee
+			CloseHandle(hEvent);
+		}
 #else
 		destroyImpl(m_Impl);
 #endif
 	}
 
+	inline EventFlag(const EventFlag &other) = delete;
+	inline EventFlag &operator=(const EventFlag &other) = delete;
+
+	inline EventFlag(EventFlag &&other) noexcept
+	{
+#ifdef SEV_EVENT_FLAG_WIN32
+		m_Event = other.m_Event;
+		other.m_Event = INVALID_HANDLE_VALUE;
+#else
+		m_Impl = other.m_Impl;
+		other.m_Impl = null;
+#endif
+	}
+
+	inline EventFlag &operator=(EventFlag &&other) noexcept
+	{
+		if (this != &other)
+		{
+			this->~EventFlag();
+			new (this) EventFlag(move(other));
+		}
+		return *this;
+	}
+
 	SEV_EVENT_FLAG_INLINE void wait()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
-		DWORD res = WaitForSingleObject(m_Event, INFINITE);
+		HANDLE hEvent = m_Event;
+		DWORD res = WaitForSingleObject(hEvent, INFINITE);
 		if (res != WAIT_OBJECT_0)
 			SEV_THROW_LAST_ERROR();
+		if (m_Event != hEvent) // This will cause either a memory access violation or throw the following exception
+			throw Exception("sev::EventFlag deleted while waiting"sv, 1); // Thread that wasn't awakened should crash and unwind
 #else
 		waitImpl(m_Impl);
 #endif

@@ -32,7 +32,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <atomic>
 #include <condition_variable>
 
+#ifdef SEV_EVENT_FLAG_STL
+#include "win32_exception.h" // TODO: exception.h
+#endif
+
 namespace sev {
+
+#ifdef SEV_EVENT_FLAG_STL
 
 struct EventFlagImpl
 {
@@ -42,9 +48,9 @@ public:
 	bool Flag;
 	bool ResetValue;
 	bool Reset;
+	int Waiting;
+	bool Delete;
 };
-
-#ifdef SEV_EVENT_FLAG_STL
 
 EventFlagImpl *EventFlag::createImpl(bool manualReset, bool initialState)
 {
@@ -52,24 +58,50 @@ EventFlagImpl *EventFlag::createImpl(bool manualReset, bool initialState)
 	m->Flag = initialState;
 	m->ResetValue = manualReset;
 	m->Reset = false;
+	m->Waiting = 0;
+	m->Delete = false;
 	return m;
 }
 
 void EventFlag::destroyImpl(EventFlagImpl *m)
 {
+	{
+		std::unique_lock<std::mutex> lock(m->Mutex);
+		if (m->Waiting)
+		{
+			m->Flag = true;
+			m->ResetValue = true;
+			m->Reset = false;
+			m->Delete = true;
+			m->CondVar.notify_all();
+			return;
+		}
+	}
 	delete m;
 }
 
 void EventFlag::waitImpl(EventFlagImpl *m)
 {
-	std::unique_lock<std::mutex> lock(m->Mutex);
-	if (m->Reset) // Reset cannot keep an already-waiting thread blocking
-		m->Flag = false;
-	while (!m->Flag)
+	bool exc;
+	bool del;
 	{
-		m->CondVar.wait(lock); // Mutex is unlocked while waiting, relocked when back
+		std::unique_lock<std::mutex> lock(m->Mutex);
+		++m->Waiting;
+		if (m->Reset) // Reset cannot keep an already-waiting thread blocking
+			m->Flag = false;
+		while (!m->Flag)
+		{
+			m->CondVar.wait(lock); // Mutex is unlocked while waiting, relocked when back
+		}
+		m->Flag = m->ResetValue;
+		--m->Waiting;
+		exc = m->Delete;
+		del = !m->Waiting && exc; // Delete on last thread exit
 	}
-	m->Flag = m->ResetValue;
+	if (del)
+		delete m; // Delayed deletion while waiting for a thread
+	if (exc)
+		throw Exception("sev::EventFlag deleted while waiting", 1);
 }
 
 void EventFlag::setImpl(EventFlagImpl *m)

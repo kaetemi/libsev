@@ -103,8 +103,14 @@ using std::nothrow;
 #include <debugbreak.h>
 #define SEV_DEBUG_BREAK() debug_break()
 
-// Assert
 #if defined(_DEBUG) && !defined(NDEBUG)
+#define SEV_DEBUG
+#else
+#define SEV_RELEASE
+#endif
+
+// Assert
+#ifdef SEV_DEBUG
 #	define SEV_ASSERT(cond) do { if (!cond) SEV_DEBUG_BREAK(); } while (false)
 #else
 #	define SEV_ASSERT(cond) do { } while (false)
