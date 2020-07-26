@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/event_flag.h>
 #include <iostream>
 #include <thread>
+#include <mutex>
 
 int main()
 {

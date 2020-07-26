@@ -173,7 +173,17 @@ Exception::Exception(const Exception &other) noexcept : m_What(copyString(other.
 
 Exception &Exception::operator=(Exception const &other) noexcept
 {
-	m_What = copyString(other.m_What.sv());
+	if (other.m_Delete)
+	{
+		m_What = copyString(other.m_What.sv());
+		m_Delete = true;
+	}
+	else
+	{
+		m_What.Data = other.m_What.Data;
+		m_What.Size = other.m_What.Size;
+		m_Delete = false;
+	}
 	return *this;
 }
 

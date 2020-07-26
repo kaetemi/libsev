@@ -43,6 +43,7 @@ TODO: Support eventfd
 
 #include "platform.h"
 
+// #define SEV_EVENT_FLAG_MOVABLE
 // #define SEV_EVENT_FLAG_STL
 
 #if !defined(SEV_EVENT_FLAG_WIN32) && !defined(SEV_EVENT_FLAG_EVENTFD) && !defined(SEV_EVENT_FLAG_STL)
@@ -95,11 +96,12 @@ public:
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		HANDLE hEvent = m_Event;
+#ifdef SEV_EVENT_FLAG_MOVABLE
 		if (hEvent != INVALID_HANDLE_VALUE)
+#endif
 		{
 			m_Event = INVALID_HANDLE_VALUE;
 			SetEvent(hEvent);
-			SwitchToThread(); // No guarantee
 			CloseHandle(hEvent);
 		}
 #else
@@ -110,6 +112,7 @@ public:
 	inline EventFlag(const EventFlag &other) = delete;
 	inline EventFlag &operator=(const EventFlag &other) = delete;
 
+#ifdef SEV_EVENT_FLAG_MOVABLE
 	inline EventFlag(EventFlag &&other) noexcept
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
@@ -130,6 +133,7 @@ public:
 		}
 		return *this;
 	}
+#endif
 
 	SEV_EVENT_FLAG_INLINE void wait()
 	{
