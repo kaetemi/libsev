@@ -166,12 +166,7 @@ Exception::~Exception() noexcept
 		delete[] m_What.Data;
 }
 
-Exception::Exception(const Exception &other) noexcept : m_What(copyString(other.m_What.sv()))
-{
-
-}
-
-Exception &Exception::operator=(Exception const &other) noexcept
+Exception::Exception(const Exception &other) noexcept
 {
 	if (other.m_Delete)
 	{
@@ -183,6 +178,15 @@ Exception &Exception::operator=(Exception const &other) noexcept
 		m_What.Data = other.m_What.Data;
 		m_What.Size = other.m_What.Size;
 		m_Delete = false;
+	}
+}
+
+Exception &Exception::operator=(Exception const &other) noexcept
+{
+	if (this != &other) 
+	{
+		this->~Exception();
+		new (this) Exception(other);
 	}
 	return *this;
 }
@@ -215,13 +219,11 @@ m_SystemMessage(copyString(other.m_SystemMessage.sv())), m_Message(copyString(ot
 
 Win32Exception &Win32Exception::operator=(Win32Exception const &other) noexcept
 {
-	base::operator=(other);
-	m_HResult = other.m_HResult;
-	m_ErrorCode = other.m_ErrorCode;
-	m_File = other.m_File;
-	m_Line = other.m_Line;
-	m_SystemMessage = copyString(other.m_SystemMessage.sv());
-	m_Message = copyString(other.m_Message.sv());
+	if (this != &other) 
+	{
+		this->~Win32Exception();
+		new (this) Win32Exception(other);
+	}
 	return *this;
 }
 
