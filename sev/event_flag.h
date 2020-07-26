@@ -34,7 +34,6 @@ Setting the flag multiple times has no effect, only one thread will continue.
 Only one thread is supposed to wait for this flag.
 
 TODO: Support eventfd
-TODO: Move stl stuff into a struct, use by pointer, due to dll boundary
 
 */
 
@@ -43,12 +42,10 @@ TODO: Move stl stuff into a struct, use by pointer, due to dll boundary
 #define SEV_EVENT_FLAG_H
 
 #include "platform.h"
-#include "win32_exception.h"
 
-#include <atomic>
-#include <condition_variable>
+// #define SEV_EVENT_FLAG_STL
 
-#if !defined(SEV_EVENT_FLAG_WIN32) && !defined(SEV_EVENT_FLAG_STL) && !defined(SEV_EVENT_FLAG_EVENTFD)
+#if !defined(SEV_EVENT_FLAG_WIN32) && !defined(SEV_EVENT_FLAG_EVENTFD) && !defined(SEV_EVENT_FLAG_STL)
 #ifdef _WIN32
 #define SEV_EVENT_FLAG_WIN32
 #else
@@ -56,9 +53,23 @@ TODO: Move stl stuff into a struct, use by pointer, due to dll boundary
 #endif
 #endif
 
+#if defined(SEV_EVENT_FLAG_WIN32)
+#include "win32_exception.h"
+#endif
+
+#if defined(SEV_EVENT_FLAG_WIN32) || defined(SEV_EVENT_FLAG_EVENTFD)
+#define SEV_EVENT_FLAG_INLINE inline
+#else
+#define SEV_EVENT_FLAG_INLINE
+#endif
+
 #ifdef __cplusplus
 
 namespace sev {
+
+#ifdef SEV_EVENT_FLAG_STL
+struct EventFlagImpl;
+#endif
 
 struct SEV_LIB EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
 {
@@ -67,13 +78,16 @@ public:
 #ifdef SEV_EVENT_FLAG_WIN32
 		: m_Event(CreateEventW(null, manualReset, manualReset, null))
 #else
-		: m_ResetValue(manualReset), m_Flag(initialState)
+		: m_Impl(createImpl(manualReset, manualReset))
 #endif
 	{
+		static_assert(sizeof(EventFlag) == sizeof(void *));
 #ifdef SEV_EVENT_FLAG_WIN32
 		static_assert(sizeof(EventFlag) == sizeof(HANDLE));
 		if (!m_Event)
 			SEV_THROW_LAST_ERROR();
+#else
+		static_assert(sizeof(EventFlag) == sizeof(EventFlagImpl *));
 #endif
 	}
 
@@ -81,45 +95,39 @@ public:
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		CloseHandle(m_Event);
+#else
+		destroyImpl(m_Impl);
 #endif
 	}
 
-	void wait()
+	SEV_EVENT_FLAG_INLINE void wait()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		DWORD res = WaitForSingleObject(m_Event, INFINITE);
 		if (res != WAIT_OBJECT_0)
 			SEV_THROW_LAST_ERROR();
 #else
-		std::unique_lock<std::mutex> lock(m_Mutex);
-		bool flag = true;
-		while (!m_Flag.compare_exchange_weak(flag, m_ResetValue))
-		{
-			flag = true;
-			m_CondVar.wait(lock);
-		}
+		waitImpl(m_Impl);
 #endif
 	}
 
-	void set()
+	SEV_EVENT_FLAG_INLINE void set()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		if (!SetEvent(m_Event))
 			SEV_THROW_LAST_ERROR();
 #else
-		std::unique_lock<std::mutex> lock(m_Mutex);
-		m_Flag = true;
-		m_CondVar.notify_one();
+		setImpl(m_Impl);
 #endif
 	}
 
-	void reset()
+	SEV_EVENT_FLAG_INLINE void reset()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		if (!ResetEvent(m_Event))
 			SEV_THROW_LAST_ERROR();
 #else
-		m_Flag = false;
+		resetImpl(m_Impl);
 #endif
 	}
 
@@ -127,10 +135,14 @@ private:
 #ifdef SEV_EVENT_FLAG_WIN32
 	HANDLE m_Event;
 #else
-	std::condition_variable m_CondVar;
-	std::mutex m_Mutex;
-	bool m_ResetValue;
-	std::atomic_bool m_Flag;
+	EventFlagImpl *m_Impl;
+
+	static EventFlagImpl *createImpl(bool manualReset, bool initialState);
+	static void destroyImpl(EventFlagImpl *m);
+
+	static void waitImpl(EventFlagImpl *m);
+	static void setImpl(EventFlagImpl *m);
+	static void resetImpl(EventFlagImpl *m);
 #endif
 
 };
@@ -140,17 +152,21 @@ private:
 #ifdef SEV_EVENT_FLAG_WIN32
 typedef HANDLE SEV_EventFlag;
 #else
-typedef sev::EventFlag *SEV_EventFlag;
+typedef sev::EventFlagImpl *SEV_EventFlag;
 #endif
 
 #else
 
-typedef void SEV_EventFlag;
+typedef void *SEV_EventFlag;
 
 #endif
 
 SEV_EventFlag SEV_EventFlag_create();
 void SEV_EventFlag_destroy(SEV_EventFlag eventFlag);
+
+bool SEV_EventFlag_wait(SEV_EventFlag eventFlag);
+bool SEV_EventFlag_set(SEV_EventFlag eventFlag);
+bool SEV_EventFlag_reset(SEV_EventFlag eventFlag);
 
 #endif /* #ifndef SEV_EVENT_FLAG_H */
 

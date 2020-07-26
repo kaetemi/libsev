@@ -35,4 +35,8 @@ int main()
 	std::cout << sev::Win32Exception(0, 0, __FILE__, __LINE__).what() << "\n";
 	std::cout << sev::Win32Exception(0, ERROR_PATH_NOT_FOUND, __FILE__, __LINE__).what() << "\n";
 	std::cout << sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__).what() << "\n";
+
+	throw sev::Win32Exception(E_OUTOFMEMORY, 0, __FILE__, __LINE__);
+
+	
 }
