@@ -31,6 +31,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
+extern SEV_LIB thread_local IEventLoop *l_EventLoop;
+
+void IEventLoop::setCurrent(bool current)
+{
+	l_EventLoop = current ? this : null;
+}
+
+bool IEventLoop::current()
+{
+	return l_EventLoop == this;
+}
+
 EventLoop::EventLoop() : m_Running(false), m_Cancel(false)
 {
 	
