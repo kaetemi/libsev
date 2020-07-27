@@ -64,6 +64,8 @@ TODO: Remove stl stuff from class definition...
 
 Can we make an virtual anonymizer thing like std::function, but for stl classes so they can be popped through dll interfaces?
 
+TODO: Class SingleLoop, MultiLoop, has virtual loop() = 0. Event loops can inherit from this to compose the thread start or synchronous run utility functions into the class.
+
 */
 
 namespace sev {
