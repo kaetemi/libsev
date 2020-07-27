@@ -31,7 +31,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
-extern SEV_LIB thread_local IEventLoop *l_EventLoop;
+namespace {
+
+thread_local IEventLoop *l_EventLoop;
+
+}
+
+IEventLoop::~IEventLoop() noexcept
+{
+
+}
 
 void IEventLoop::setCurrent(bool current)
 {

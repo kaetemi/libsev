@@ -85,7 +85,7 @@ class SEV_LIB IEventLoop;
 class SEV_LIB IEventLoop
 {
 public:
-	virtual ~IEventLoop() noexcept = 0;
+	virtual ~IEventLoop() noexcept;
 
 	//! Number of threads processing this event loop
 	virtual int threads() = 0;
@@ -314,10 +314,8 @@ public:
 	//! Block call until the queued functions  finished processing. Set empty to repeat the wait until the queue is empty
 	void join(bool empty = false) // thread-safe
 	{
-		std::mutex syncLock;
-		std::condition_variable syncCond;
-		std::unique_lock<std::mutex> lock(syncLock);
-		EventFunction syncFunc = [this, &syncLock, &syncCond, &syncFunc, empty]() -> void {
+		EventFlag flag;
+		EventFunction syncFunc = [this, &flag, &syncFunc, empty]() -> void {
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			if (empty && !m_ImmediateConcurrent.empty())
 #else
@@ -333,12 +331,11 @@ public:
 			}
 			else
 			{
-				std::unique_lock<std::mutex> lock(syncLock);
-				syncCond.notify_one();
+				flag.set();
 			}
 		};
 		immediate(syncFunc);
-		syncCond.wait(lock);
+		flag.wait();
 	}
 
 	/*
