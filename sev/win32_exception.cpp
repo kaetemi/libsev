@@ -241,7 +241,7 @@ Exception::StringView Win32Exception::systemMessageImpl(const HRESULT hr, DWORD 
 
 void Win32Exception::destroyStringView(StringView sv)
 {
-	delete sv.Data;
+	delete[] sv.Data;
 }
 
 }
