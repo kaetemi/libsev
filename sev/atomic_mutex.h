@@ -35,6 +35,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // #define SEV_SUPPRESS_ATOMIC_MUTEX
 
+#ifdef __cplusplus
+
 #ifndef SEV_SUPPRESS_ATOMIC_MUTEX
 
 #include <atomic>
@@ -139,6 +141,8 @@ private:
 } /* namespace sev */
 
 #endif /* #ifndef SEV_SUPPRESS_ATOMIC_MUTEX */
+
+#endif /* #ifdef __cplusplus */
 
 #endif /* #ifndef SEV_ATOMIC_MUTEX_H */
 
