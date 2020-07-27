@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2017-2019  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
+Copyright (C) 2017-2020  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,33 +30,37 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_ATOMIC_SHARED_MUTEX_H
 #define SEV_ATOMIC_SHARED_MUTEX_H
 
+#include "platform.h"
+
+// #define SEV_SUPPRESS_ATOMIC_MUTEX
+
 #ifndef SEV_SUPPRESS_ATOMIC_MUTEX
 
 #include <atomic>
 #include <thread>
 
-#include "debug_break.h"
+#include "debugbreak.h"
 
 namespace sev {
 
 //! Lock allowing one unique writer and multiple shared readers
-class atomic_shared_mutex
+class AtomicSharedMutex
 {
 public:
-	inline atomic_shared_mutex() : unique_(false), sharing_(0)
+	inline AtomicSharedMutex() noexcept : m_Unique(false), m_Sharing(0)
 	{
 
 	}
 
-#ifndef NDEBUG
-	inline ~atomic_shared_mutex()
+#ifdef SEV_DEBUG
+	inline ~AtomicSharedMutex() noexcept
 	{
 		if (!try_lock())
 			debug_break(); // Must be unlocked before destroying
 	}
 #endif
 
-	inline bool try_lock()
+	inline bool try_lock() noexcept
 	{
 		if (m_Unique.exchange(true))
 			return false; // Already locked for unique
@@ -68,81 +72,81 @@ public:
 		return true; // Successfully locked for unique and sharing
 	}
 
-	inline bool tryLock()
+	inline bool tryLock() noexcept
 	{
 		return try_lock();
 	}
 
-	inline void lock()
+	inline void lock() noexcept
 	{
-		while (unique_.exchange(true))
+		while (m_Unique.exchange(true))
 			std::this_thread::yield();
-		while (sharing_)
+		while (m_Sharing)
 			std::this_thread::yield();
 	}
 
-	inline void unlock()
+	inline void unlock() noexcept
 	{
 #ifndef NDEBUG
-		if (!unique_.exchange(false))
+		if (!m_Unique.exchange(false))
 			debug_break(); // Already unlocked before
 #else
-		unique_.exchange(false);
+		m_Unique.exchange(false);
 #endif
 	}
 
-	inline bool try_lock_shared()
+	inline bool try_lock_shared() noexcept
 	{
-		++sharing_;
-		if (unique_)
+		++m_Sharing;
+		if (m_Unique)
 		{
-			--sharing_;
+			--m_Sharing;
 			return false;
 		}
 		return true;
 	}
 	
-	inline bool tryLockShared()
+	inline bool tryLockShared() noexcept
 	{
 		return try_lock_shared();
 	}
 
-	inline void lock_shared()
+	inline void lock_shared() noexcept
 	{
-		++sharing_;
-		while (unique_)
+		++m_Sharing;
+		while (m_Unique)
 		{
-			--sharing_;
-			while (unique_)
+			--m_Sharing;
+			while (m_Unique)
 				std::this_thread::yield();
-			++sharing_;
+			++m_Sharing;
 		}
 	}
 	
-	inline void lockShared()
+	inline void lockShared() noexcept
 	{
 		lock_shared();
 	}
 	
-	inline void unlock_shared()
+	inline void unlock_shared() noexcept
 	{
-		--sharing_;
+		--m_Sharing;
 	}
 	
-	inline void unlockShared()
+	inline void unlockShared() noexcept
 	{
 		unlock_shared();
 	}
 
 private:
-	std::atomic_bool unique_;
-	std::atomic_int sharing_;
+	std::atomic_bool m_Unique;
+	std::atomic_int m_Sharing;
 
 private:
-	atomic_shared_mutex &operator=(const atomic_shared_mutex&) = delete;
-	atomic_shared_mutex(const atomic_shared_mutex&) = delete;
+	AtomicSharedMutex &operator=(const AtomicSharedMutex&) = delete;
+	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
 
-}; /* class atomic_shared_mutex */
+}; /* class AtomicSharedMutex */
 
 } /* namespace sev */
 
@@ -152,7 +156,73 @@ private:
 
 namespace sev {
 
-using atomic_shared_mutex = std::shared_mutex;
+//! Lock allowing one unique writer and multiple shared readers
+class AtomicSharedMutex
+{
+public:
+	inline AtomicSharedMutex() noexcept
+	{
+
+	}
+
+	inline bool try_lock() noexcept
+	{
+		return m_Mutex.try_lock();
+	}
+
+	inline bool tryLock() noexcept
+	{
+		return try_lock();
+	}
+
+	inline void lock() noexcept
+	{
+		m_Mutex.lock();
+	}
+
+	inline void unlock() noexcept
+	{
+		m_Mutex.unlock();
+	}
+
+	inline bool try_lock_shared() noexcept
+	{
+		return m_Mutex.try_lock_shared();
+	}
+
+	inline bool tryLockShared() noexcept
+	{
+		return try_lock_shared();
+	}
+
+	inline void lock_shared() noexcept
+	{
+		m_Mutex.lock_shared();
+	}
+
+	inline void lockShared() noexcept
+	{
+		lock_shared();
+	}
+
+	inline void unlock_shared() noexcept
+	{
+		m_Mutex.unlock_shared();
+	}
+
+	inline void unlockShared() noexcept
+	{
+		unlock_shared();
+	}
+
+private:
+	std::shared_mutex m_Mutex;
+
+private:
+	AtomicSharedMutex &operator=(const AtomicSharedMutex&) = delete;
+	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
+
+}; /* class AtomicSharedMutex */
 
 } /* namespace sev */
 

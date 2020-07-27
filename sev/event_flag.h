@@ -100,8 +100,11 @@ public:
 		if (hEvent != INVALID_HANDLE_VALUE)
 #endif
 		{
+#ifdef SEV_DEBUG
+			// Undefined behaviour, so try to crash if something's still waiting
 			m_Event = INVALID_HANDLE_VALUE;
 			SetEvent(hEvent);
+#endif
 			CloseHandle(hEvent);
 		}
 #else
@@ -142,8 +145,10 @@ public:
 		DWORD res = WaitForSingleObject(hEvent, INFINITE);
 		if (res != WAIT_OBJECT_0)
 			SEV_THROW_LAST_ERROR();
+#ifdef SEV_DEBUG
 		if (m_Event != hEvent) // This will cause either a memory access violation or throw the following exception
 			throw Exception("sev::EventFlag deleted while waiting"sv, 1); // Thread that wasn't awakened should crash and unwind
+#endif
 #else
 		waitImpl(m_Impl);
 #endif

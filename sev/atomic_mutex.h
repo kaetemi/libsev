@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2016-2019  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
+Copyright (C) 2016-2020  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,47 +30,50 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_ATOMIC_MUTEX_H
 #define SEV_ATOMIC_MUTEX_H
 
+#include "platform.h"
+
+#define SEV_SUPPRESS_ATOMIC_MUTEX
+
 #ifndef SEV_SUPPRESS_ATOMIC_MUTEX
 
 #include <atomic>
 #include <thread>
-
 
 namespace sev {
 
 class AtomicMutex
 {
 public:
-	inline AtomicMutex()
+	inline AtomicMutex() noexcept
 	{
 		m_Atomic.clear();
 	}
 
 #ifdef SEV_DEBUG
-	inline ~AtomicMutex()
+	inline ~AtomicMutex() noexcept
 	{
 		if (!tryLock())
 			debug_break(); // Must be unlocked before destroying
 	}
 #endif
 
-	inline void lock()
+	inline void lock() noexcept
 	{
 		while (m_Atomic.test_and_set())
 			std::this_thread::yield();
 	}
 
-	inline bool try_lock()
+	inline bool try_lock() noexcept
 	{
 		return !m_Atomic.test_and_set();
 	}
 
-	inline bool tryLock()
+	inline bool tryLock() noexcept
 	{
 		return try_lock();
 	}
 
-	inline void unlock()
+	inline void unlock() noexcept
 	{
 		m_Atomic.clear();
 	}
@@ -92,7 +95,45 @@ private:
 
 namespace sev {
 
-using AtomicMutex = std::mutex;
+class AtomicMutex
+{
+public:
+	inline AtomicMutex()
+	{
+		
+	}
+
+	inline void lock()
+	{
+		m_Mutex.lock();
+	}
+
+	inline bool try_lock()
+	{
+		return m_Mutex.try_lock();
+	}
+
+	inline bool tryLock()
+	{
+		return try_lock();
+	}
+
+	inline void unlock()
+	{
+#pragma warning(push)
+#pragma warning(disable: 26110)
+		m_Mutex.unlock();
+#pragma warning(pop)
+	}
+
+private:
+	std::mutex m_Mutex;
+
+private:
+	AtomicMutex &operator=(const AtomicMutex&) = delete;
+	AtomicMutex(const AtomicMutex&) = delete;
+
+}; /* class AtomicMutex */
 
 } /* namespace sev */
 
