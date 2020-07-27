@@ -239,6 +239,11 @@ Exception::StringView Win32Exception::systemMessageImpl(const HRESULT hr, DWORD 
 	return getWin32Message(errorCode);
 }
 
+void Win32Exception::destroyStringView(StringView sv)
+{
+	delete sv.Data;
+}
+
 }
 
 /* end of file */

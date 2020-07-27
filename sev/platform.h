@@ -92,6 +92,9 @@ using std::nothrow;
 // auto _ = gsl::finally([&] { delete xyz; });
 #include "gsl/gsl_util"
 
+// The usual
+#include <functional>
+
 // Force inline
 #ifdef _MSC_VER
 #	define SEV_FORCE_INLINE __forceinline

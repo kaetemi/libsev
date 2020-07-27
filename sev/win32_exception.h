@@ -100,13 +100,14 @@ public:
 	{
 		std::string res;
 		StringView str = systemMessageImpl(hr, errorCode);
-		res = str.sv();
-		delete[] str.Data;
+		auto d = gsl::finally(std::bind(destroyStringView, str));
+		res = str.sv(); // Could throw out-of-memory
 		return res;
 	}
 	
 private:
 	static StringView systemMessageImpl(const HRESULT hr, DWORD errorCode);
+	static void destroyStringView(StringView sv); // Can't share new and delete over boundaries
 
 private:
 	HRESULT m_HResult;
