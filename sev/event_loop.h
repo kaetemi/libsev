@@ -1,17 +1,18 @@
 /*
 
-Copyright (C) 2016-2017  by authors
-Author: Jan Boon <jan.boon@kaetemi.be>
+Copyright (C) 2016-2020  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
-* Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -29,8 +30,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef SEV_EVENT_LOOP_H
 #define SEV_EVENT_LOOP_H
 
-#include "self_config.h"
-#ifdef SEV_MODULE_EVENT_LOOP
+#include "platform.h"
+#ifdef __cplusplus
+
+#ifdef _MSC_VER
+#define SEV_EVENT_LOOP_CONCURRENT_QUEUE
+#endif
 
 #include <thread>
 #include <mutex>
@@ -41,16 +46,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <queue>
 #include <set>
 
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 #	include <concurrent_queue.h>
 #	include <concurrent_priority_queue.h>
 #else
 #	include "atomic_mutex.h"
 #endif
 
-#ifdef WIN32
-typedef void *HANDLE;
-#endif
+#include "event_flag.h"
+
+/*
+
+TODO: IEventLoop
+TODO: Try ring buffer?
+TODO: Remove stl stuff from class definition...
+
+*/
 
 namespace sev {
 
@@ -64,12 +75,13 @@ struct EventLoopOptions
 */
 
 typedef std::function<void()> EventFunction;
+typedef std::function<void(ptrdiff_t)> EventKernel;
 
 class SEV_LIB EventLoop
 {
 public:
 	EventLoop();
-	virtual ~EventLoop();
+	virtual ~EventLoop() noexcept;
 
 	void run()
 	{
@@ -95,7 +107,7 @@ public:
 
 	void clear() // semi-thread-safe
 	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 		m_ImmediateConcurrent.clear();
 		m_TimeoutConcurrent.clear();
 #else
@@ -119,7 +131,7 @@ public:
 		std::condition_variable syncCond;
 		std::unique_lock<std::mutex> lock(syncLock);
 		EventFunction syncFunc = [this, &syncLock, &syncCond, &syncFunc, empty]() -> void {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			if (empty && !m_ImmediateConcurrent.empty())
 #else
 			bool immediateEmpty;
@@ -147,7 +159,7 @@ private:
 	template<typename T>
 	inline void immediate_(T &&f) 
 	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 		m_ImmediateConcurrent.push(std::forward<T>(f));
 #else
 		std::unique_lock<AtomicMutex> lock(m_QueueLock);
@@ -171,7 +183,7 @@ public:
 	template<typename T = EventFunction>
 	inline void immediate(T &&f)
 	{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 		m_ImmediateConcurrent.push(std::forward<EventFunction>(f));
 #else
 		std::unique_lock<AtomicMutex> lock(m_QueueLock);
@@ -188,7 +200,7 @@ public:
 		tf.time = std::chrono::steady_clock::now() + delta;
 		tf.interval = std::chrono::nanoseconds::zero();
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
 			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
@@ -206,7 +218,7 @@ public:
 		tf.time = std::chrono::steady_clock::now() + interval;
 		tf.interval = interval;
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
 			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
@@ -224,7 +236,7 @@ public:
 		tf.time = point;
 		tf.interval = std::chrono::steady_clock::duration::zero();
 		; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			m_TimeoutConcurrent.push(std::move(tf));
 #else
 			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
@@ -247,7 +259,7 @@ public:
 
 private:
 	void loop();
-	void poke();
+	inline void poke() { m_Flag.set(); }
 
 private:
 	struct timeout_func
@@ -265,18 +277,10 @@ private:
 
 private:
 	bool m_Running;
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-	volatile bool m_Poked;
-#endif
 	std::thread m_Thread;
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-	std::mutex m_PokeLock;
-	std::condition_variable m_PokeCond;
-#else
-	HANDLE m_PokeEvent;
-#endif
+	EventFlag m_Flag;
 
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 	concurrency::concurrent_queue<EventFunction> m_ImmediateConcurrent;
 	concurrency::concurrent_priority_queue<timeout_func> m_TimeoutConcurrent;
 #else
@@ -291,7 +295,7 @@ private:
 
 } /* namespace sev */
 
-#endif /* #ifdef SEV_MODULE_EVENT_LOOP */
+#endif /* #ifdef __cplusplus */
 
 #endif /* #ifndef SEV_EVENT_LOOP_H */
 

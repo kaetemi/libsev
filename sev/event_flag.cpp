@@ -104,6 +104,32 @@ void EventFlag::waitImpl(EventFlagImpl *m)
 		throw Exception("sev::EventFlag deleted while waiting", 1);
 }
 
+bool EventFlag::waitImpl(EventFlagImpl *m, int timeoutMs)
+{
+	bool exc;
+	bool del;
+	bool res = true;
+	{
+		std::unique_lock<std::mutex> lock(m->Mutex);
+		++m->Waiting;
+		if (m->Reset) // Reset cannot keep an already-waiting thread blocking
+			m->Flag = false;
+		while (!m->Flag)
+		{
+			res = m->CondVar.wait_for(lock, std::chrono::milliseconds(timeoutMs)) != std::cv_status::timeout; // Mutex is unlocked while waiting, relocked when back
+		}
+		m->Flag = m->ResetValue;
+		--m->Waiting;
+		exc = m->Delete;
+		del = !m->Waiting && exc; // Delete on last thread exit
+	}
+	if (del)
+		delete m; // Delayed deletion while waiting for a thread
+	if (exc)
+		throw Exception("sev::EventFlag deleted while waiting", 1);
+	return res;
+}
+
 void EventFlag::setImpl(EventFlagImpl *m)
 {
 	std::unique_lock<std::mutex> lock(m->Mutex);

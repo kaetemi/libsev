@@ -154,6 +154,25 @@ public:
 #endif
 	}
 
+	SEV_EVENT_FLAG_INLINE bool wait(int timeoutMs) // Returns false on timeout
+	{
+#ifdef SEV_EVENT_FLAG_WIN32
+		HANDLE hEvent = m_Event;
+		DWORD res = WaitForSingleObject(hEvent, timeoutMs);
+		if (res == WAIT_TIMEOUT)
+			return false;
+		if (res != WAIT_OBJECT_0)
+			SEV_THROW_LAST_ERROR();
+#ifdef SEV_DEBUG
+		if (m_Event != hEvent) // This will cause either a memory access violation or throw the following exception
+			throw Exception("sev::EventFlag deleted while waiting"sv, 1); // Thread that wasn't awakened should crash and unwind
+#endif
+		return true;
+#else
+		return waitImpl(m_Impl, timeoutMs);
+#endif
+	}
+
 	SEV_EVENT_FLAG_INLINE void set()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
@@ -184,6 +203,7 @@ private:
 	static void destroyImpl(EventFlagImpl *m);
 
 	static void waitImpl(EventFlagImpl *m);
+	static bool waitImpl(EventFlagImpl *m, int timeoutMs);
 	static void setImpl(EventFlagImpl *m);
 	static void resetImpl(EventFlagImpl *m);
 #endif

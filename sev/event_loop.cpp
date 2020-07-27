@@ -1,17 +1,18 @@
 /*
 
-Copyright (C) 2017  by authors
-Author: Jan Boon <support@no-break.space>
+Copyright (C) 2016-2020  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
-* Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation
-and/or other materials provided with the distribution.
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -27,39 +28,27 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "event_loop.h"
-#ifdef SEV_MODULE_EVENT_LOOP
-
-#include "impl/platform_win32.h"
 
 namespace sev {
 
 EventLoop::EventLoop() : m_Running(false), m_Cancel(false)
 {
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-	m_PokeEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-#endif
+	sizeof(std::thread);
 }
 
-EventLoop::~EventLoop()
+EventLoop::~EventLoop() noexcept
 {
 	stop();
 	clear();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-	CloseHandle(m_PokeEvent);
-#endif
 }
 
 void EventLoop::loop()
 {
 	while (m_Running)
 	{
-#ifndef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-		m_Poked = false;
-#endif
-
 		for (;;)
 		{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			EventFunction f;
 			if (!m_ImmediateConcurrent.try_pop(f))
 				break;
@@ -80,7 +69,7 @@ void EventLoop::loop()
 		bool poked = false;
 		for (;;)
 		{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			timeout_func tf;
 			if (!m_TimeoutConcurrent.try_pop(tf))
 				break;
@@ -95,31 +84,19 @@ void EventLoop::loop()
 			const timeout_func &tfr = m_Timeout.top();
 #endif
 			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-			DWORD wt = (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(tfr.time - now).count();
-			if (tfr.time > now && wt > 0)
-#else
-			if (tfr.time > now) // wait
-#endif
+			int64_t wt = std::chrono::duration_cast<std::chrono::milliseconds>(tfr.time - now).count();
+			if (tfr.time > now) // Wait
 			{
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 				m_TimeoutConcurrent.push(tf);
 #else
 				m_QueueTimeoutLock.unlock();
 #endif
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-				WaitForSingleObject(m_PokeEvent, wt);
-#else
-				; {
-					std::unique_lock<std::mutex> lock(m_PokeLock);
-					if (!m_Poked)
-						m_PokeCond.wait_until(lock, tfr.time);
-				}
-#endif
+				m_Flag.wait(wt & 0xFFFF); // Mask to 65 seconds, it's fine to break out earlier, the loop re-checks
 				poked = true;
 				break;
 			}
-#ifndef SEV_DEPEND_MSVC_CONCURRENT
+#ifndef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 			timeout_func tf = tfr;
 			m_Timeout.pop();
 			m_QueueTimeoutLock.unlock();
@@ -130,7 +107,7 @@ void EventLoop::loop()
 			{
 				tf.time += tf.interval;
 				; {
-#ifdef SEV_DEPEND_MSVC_CONCURRENT
+#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
 					m_TimeoutConcurrent.push(std::move(tf));
 #else
 					std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
@@ -142,26 +119,9 @@ void EventLoop::loop()
 
 		if (!poked)
 		{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-			WaitForSingleObject(m_PokeEvent, INFINITE);
-#else
-			std::unique_lock<std::mutex> lock(m_PokeLock);
-			if (!m_Poked)
-				m_PokeCond.wait(lock);
-#endif
+			m_Flag.wait();
 		}
 	}
-}
-
-void EventLoop::poke() // private
-{
-#ifdef SEV_DEPEND_WIN32_SYNCHRONIZATION_EVENT
-	SetEvent(m_PokeEvent);
-#else
-	std::unique_lock<std::mutex> lock(m_PokeLock);
-	m_PokeCond.notify_one();
-	m_Poked = true;
-#endif
 }
 
 } /* namespace sev */
@@ -178,7 +138,5 @@ void test()
 } /* anonymous namespace */
 
 } /* namespace sev */
-
-#endif /* #ifdef SEV_MODULE_EVENT_LOOP */
 
 /* end of file */
