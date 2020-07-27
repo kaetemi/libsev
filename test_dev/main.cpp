@@ -27,6 +27,49 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+/*
+Allocation count: 0
+The operation completed successfully.
+File: X:\source\libsev\test_dev\main.cpp, line: 73
+The system cannot find the path specified.
+DWORD: 0x00000003
+File: X:\source\libsev\test_dev\main.cpp, line: 74
+Not enough memory resources are available to complete this operation.
+HRESULT: 0x8007000e
+File: X:\source\libsev\test_dev\main.cpp, line: 75
+Allocation count: 6
+Allocation count: 0
+1
+2
+3
+4
+5
+.
+1
+2
+3
+.
+1
+2
+3
+4 (Exception OK)
+sev::EventFlag deleted while waiting
+5
+.
+Y
+Allocation count: 3
+Allocation count: 0
+Allocation count: 0
+Allocation count: 0
+Access is denied.
+The operation completed successfully.
+Not implemented
+The local WINS cannot be deleted.
+The attribute type specified to the directory service is not defined.
+The specified quick mode policy was not found.
+Allocation count: 0
+*/
+
 #include <sev/win32_exception.h>
 #include <sev/event_flag.h>
 #include <iostream>
@@ -218,6 +261,20 @@ int main()
 		sev::Exception c = b;
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		ptrdiff_t z = s_AllocationCount; // Needs static link to work
+		std::cout << "Allocation count: "sv << z << "\n"sv;
+	}
+
+	{
+		std::cout << sev::Win32Exception::systemMessage(E_ACCESSDENIED);
+		std::cout << sev::Win32Exception::systemMessage(S_OK);
+		std::cout << sev::Win32Exception::systemMessage(E_NOTIMPL);
+		std::cout << sev::Win32Exception::systemMessage(S_OK, ERROR_CAN_NOT_DEL_LOCAL_WINS);
+		std::cout << sev::Win32Exception::systemMessage(S_OK, ERROR_DS_ATTRIBUTE_TYPE_UNDEFINED);
+		std::cout << sev::Win32Exception::systemMessage(S_OK, ERROR_IPSEC_QM_POLICY_NOT_FOUND);
 	}
 
 	{

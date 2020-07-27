@@ -232,6 +232,13 @@ Win32Exception &Win32Exception::operator=(Win32Exception const &other) noexcept
 	return m_Message.Data ? m_Message.Data : (m_SystemMessage.Data ? m_SystemMessage.Data : base::what());
 }
 
+Exception::StringView Win32Exception::systemMessageImpl(const HRESULT hr, DWORD errorCode)
+{
+	if (!errorCode)
+		errorCode = (HRESULT_FACILITY(hr) == FACILITY_WINDOWS ? HRESULT_CODE(hr) : hr);
+	return getWin32Message(errorCode);
+}
+
 }
 
 /* end of file */

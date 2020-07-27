@@ -91,10 +91,23 @@ public:
 
 	[[nodiscard]] virtual char const *what() const;
 
-	inline std::string_view file() const { return m_File.sv();  };
-	inline int line() const { return m_Line;  };
-	inline std::string_view systemMessage() const { return m_SystemMessage.sv();  };
+	inline std::string_view file() const { return m_File.sv(); };
+	inline int line() const { return m_Line; };
+	inline std::string_view systemMessage() const { return m_SystemMessage.sv(); };
+
+	// Either pass hr or errorCode (and hr = S_OK)
+	inline static std::string systemMessage(const HRESULT hr, const DWORD errorCode = 0)
+	{
+		std::string res;
+		StringView str = systemMessageImpl(hr, errorCode);
+		res = str.sv();
+		delete[] str.Data;
+		return res;
+	}
 	
+private:
+	static StringView systemMessageImpl(const HRESULT hr, DWORD errorCode);
+
 private:
 	HRESULT m_HResult;
 	DWORD m_ErrorCode;
