@@ -33,7 +33,7 @@ namespace sev {
 
 EventLoop::EventLoop() : m_Running(false), m_Cancel(false)
 {
-	sizeof(std::thread);
+	
 }
 
 EventLoop::~EventLoop() noexcept

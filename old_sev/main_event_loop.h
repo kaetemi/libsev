@@ -36,6 +36,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "event_loop.h"
 #include "shared_singleton.h"
 
+// https://docs.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
+
 namespace sev {
 
 typedef std::function<void(EventLoop *el, int argc, const char *argv[])> MainFunction;
