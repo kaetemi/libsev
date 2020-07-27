@@ -33,7 +33,7 @@ throw Win32Exception(...);
 catch (Win32Exception &ex) { char *what = ex.what(); ... }
 
 Only throw exceptions in exceptional cases that shouldn't happen.
-Regular error handling should use error return values.
+Regular error handling, and non-critical errors, should use error return values.
 Exception messages are in UTF-8.
 
 */
