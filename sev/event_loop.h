@@ -65,6 +65,9 @@ TODO: Remove stl stuff from class definition...
 Can we make an virtual anonymizer thing like std::function, but for stl classes so they can be popped through dll interfaces?
 
 TODO: Class SingleLoop, MultiLoop, has virtual loop() = 0. Event loops can inherit from this to compose the thread start or synchronous run utility functions into the class.
+Just have std::thread in a pointer, so we don't need to deal with weird stuff.
+Do need a DLL-safe shared_ptr implementation?
+Actually for our own types based on STL templates, we can enforce a DLL-exported template instance! As long as they're not exposed... So, better not...
 
 */
 
@@ -81,6 +84,8 @@ struct EventLoopOptions
 
 typedef std::function<void()> EventFunction; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
 // typedef std::function<void(ptrdiff_t)> EventKernel;
+
+// Or... typedef std::function<void(IEventLoop &el)> EventFunction; ?
 
 class SEV_LIB IEventLoop;
 
