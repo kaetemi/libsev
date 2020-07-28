@@ -87,6 +87,7 @@ using std::strong_ordering;
 #endif
 using std::move;
 using std::nothrow;
+using std::forward;
 
 // Include GSL
 // auto _ = gsl::finally([&] { delete xyz; });

@@ -55,6 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "event_flag.h"
+#include "event_function.h"
 
 /*
 
@@ -82,7 +83,7 @@ struct EventLoopOptions
 }
 */
 
-typedef std::function<void()> EventFunction; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
+// typedef std::function<void()> EventFunction; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
 // typedef std::function<void(ptrdiff_t)> EventKernel;
 
 // Or... typedef std::function<void(IEventLoop &el)> EventFunction; ?

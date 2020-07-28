@@ -76,6 +76,7 @@ Allocation count: 0
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <functional>
 
 static std::atomic_ptrdiff_t s_AllocationCount;
 
