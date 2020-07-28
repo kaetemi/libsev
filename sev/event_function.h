@@ -33,6 +33,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "platform.h"
 
+/*
+
+TODO: Rather than this mechanism, it might be more interesting to directly implement a function_ring_buffer...
+that way there's no random allocations involved! (Post on this!)
+Start with a proof of concept FunctionVector.
+
+*/
+
 #ifdef __cplusplus
 
 #define SEV_EVENT_FUNCTION_ALIGN 64
