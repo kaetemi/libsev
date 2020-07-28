@@ -123,10 +123,16 @@ private:
 	static const impl::EventFunctionVTable c_VTable;
 
 public:
-	inline constexpr EventFunction() : m_VTable(&c_VTable), m_Storage{}
+#pragma warning(push)
+#pragma warning(disable: 26495)
+#ifdef __INTELLISENSE__
+#pragma diag_suppress 2398
+#endif
+	inline constexpr EventFunction() : m_VTable(&c_VTable) /*, m_Storage{} */
 	{
 		
 	}
+#pragma warning(pop)
 
 	template<class TFn>
 	EventFunction(TFn &&fn)
@@ -227,6 +233,7 @@ private:
 		uint8_t Data[c_Capacity];
 
 	} m_Storage;
+
 	const impl::EventFunctionVTable *m_VTable;
 
 };
