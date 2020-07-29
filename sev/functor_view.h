@@ -52,7 +52,7 @@ public:
 #ifdef __INTELLISENSE__
 #pragma diag_suppress 2398
 #endif
-	FunctorView()
+	FunctorView() noexcept
 	{
 		static const auto vtable = TVt();
 		m_Vt = vtable;
@@ -60,7 +60,7 @@ public:
 #pragma warning(pop)
 
 	template<class TFn>
-	FunctorView(const TFn &fn)
+	FunctorView(const TFn &fn) noexcept
 	{
 		static const auto vtable = TVt(fn);
 		m_Vt = &vtable;
@@ -69,7 +69,7 @@ public:
 	}
 
 	template<class TFn>
-	FunctorView(TFn &fn)
+	FunctorView(TFn &fn) noexcept
 	{
 		static const auto vtable = TVt(fn);
 		m_Vt = &vtable;
@@ -78,7 +78,7 @@ public:
 	}
 
 	template<class TFn>
-	FunctorView(TFn &&fn)
+	FunctorView(TFn &&fn) noexcept
 	{
 		static const auto vtable = TVt(fn);
 		m_Vt = &vtable;
@@ -94,26 +94,26 @@ public:
 		return m_Vt->Invoke(m_Ptr, value...);
 	}
 
-	inline bool movable()
+	inline bool movable() const noexcept
 	{
 		return m_Movable;
 	}
 
-	FunctorView(const FunctorView &other)
+	FunctorView(const FunctorView &other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;
 	}
 
-	FunctorView(FunctorView &other)
+	FunctorView(FunctorView &other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;
 	}
 
-	FunctorView(FunctorView &&other)
+	FunctorView(FunctorView &&other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr), m_Movable(other.m_Movable)
 	{
 		// When moving a movable, the other vtable gets reset to the default
@@ -121,7 +121,7 @@ public:
 		other.m_Vt = &vtable;
 	}
 
-	FunctorView &operator= (const FunctorView &other)
+	FunctorView &operator= (const FunctorView &other) noexcept
 	{
 		if (*this != other)
 		{
@@ -130,7 +130,7 @@ public:
 		}
 	}
 
-	FunctorView &operator= (FunctorView &&other)
+	FunctorView &operator= (FunctorView &&other) noexcept
 	{
 		if (*this != other)
 		{
