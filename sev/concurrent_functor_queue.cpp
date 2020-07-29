@@ -54,10 +54,10 @@ struct FunctorPreamble
 } /* anonymous namespace */
 } /* namespace sev */
 
-SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create()
+SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize)
 {
 	static_assert(sizeof(SEV_ConcurrentFunctorQueue) == sizeof(sev::ConcurrentFunctorQueue<void()>));
-	return (SEV_ConcurrentFunctorQueue *)new sev::ConcurrentFunctorQueue<void()>();
+	return (SEV_ConcurrentFunctorQueue *)new sev::ConcurrentFunctorQueue<void()>(blockSize);
 }
 
 void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFunctorQueue)
@@ -65,19 +65,23 @@ void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFu
 	delete (sev::ConcurrentFunctorQueue<void()> *)concurrentFunctorQueue;
 }
 
-void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me)
+void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
 {
-	me->ReadBlock = null;
-	me->WriteBlock = null;
-	me->SpareBlock = null;
+	me->BlockSize = blockSize;
+	me->ReadBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN);
+	me->WriteBlock = me->ReadBlock;
+	me->SpareBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write
+	me->ReadIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
+	me->PreWriteIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
 }
 
-// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
-
-void SEV_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
+	// This function only locks while flipping to the next buffer
+	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
+
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_FUNCTOR_ALIGN);
-	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(size + sizeof(sev::FunctorPreamble)); // Pad
+	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(vt->Size + sizeof(sev::FunctorPreamble)); // Pad
 	const ptrdiff_t blockSize = me->BlockSize;
 	ptrdiff_t idx = me->PreWriteIdx;
 	uint8_t *block = me->WriteBlock;
@@ -94,7 +98,7 @@ void SEV_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, ptrdiff_
 			idx = me->PreWriteIdx;
 			block = me->WriteBlock; // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
 		}
-		nextIdx = idx + size;
+		nextIdx = idx + sz;
 		if (_InterlockedCompareExchangePointer((void *volatile *)(&me->PreWriteIdx), (void *)nextIdx, (void *)idx) != (void *)idx)
 		{
 			std::this_thread::yield();
@@ -118,7 +122,7 @@ void SEV_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, ptrdiff_
 		// Start from the beginning, offset alignment
 		static_assert((SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble)) >= sizeof(sev::BlockPreamble));
 		idx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble); // Block preamble is preceeding
-		nextIdx = idx + size;
+		nextIdx = idx + sz;
 
 		// Reuse leftover block
 		block = me->SpareBlock;
