@@ -38,6 +38,57 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/functor_view.h>
 #include <sev/concurrent_functor_queue.h>
 
+/*
+Local allocation count: 0
+Hello world 42
+Local allocation count: 0
+Movable: NO
+5 = Five
+5 = Five
+-
+5 = Five
+5 = Five
+Local allocation count: 0
+Movable: YES
+5 = Five
+-
+5 = Five
+5 = Five
+Local allocation count: 0
+Movable: YES
+5 = Five
+-
+5 = Five
+Movable: YES
+bad function call
+Exception OK!
+Local allocation count: 0
+Local allocation count (string): 1
+Local allocation count (string and lambda): 2
+Movable: YES
+5 = Five
+-
+Should not yet be empty: 5 = Five
+Local allocation count (before): 2
+Local allocation count (after): 3
+5 = Five
+bad function call
+Exception OK!
+Should be empty: 5 =
+Local allocation count: 3
+-
+Local allocation count: 0
+-->
+Local allocation count: 1
+Added one
+Local allocation count: 2
+Should be empty:
+Added all
+Local allocation count: 131076
+<--
+Local allocation count: 0
+*/
+
 static std::atomic_ptrdiff_t s_AllocationCount;
 
 // Override global C++ allocation for debug purpose
@@ -173,13 +224,12 @@ int main()
 		z.toFunctor(false);
 		z.toFunctor(false);
 		z.toFunctor(false);
-		z.toFunctor(false); // FIXME: Functor is not releasing correctly?!
+		z.toFunctor(false);
 		sev::Functor<void()> y = z.toFunctor(true);
 		{
 			ptrdiff_t z = s_AllocationCount;
-			std::cout << "Local allocation count (after, should be the same): "sv << z << "\n"sv; // 2
+			std::cout << "Local allocation count (after): "sv << z << "\n"sv; // 2
 		}
-		/*
 		y();
 		try
 		{
@@ -191,7 +241,7 @@ int main()
 			std::cout << ex.what() << std::endl;
 			std::cout << "Exception OK!"sv << std::endl;
 		}
-		std::cout << "Should be empty: "sv;*/
+		std::cout << "Should be empty: "sv;
 		func(); // This will now give an empty string, since it was actually moved
 		{
 			ptrdiff_t z = s_AllocationCount;
