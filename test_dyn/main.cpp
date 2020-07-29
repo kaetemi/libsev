@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <functional>
 #include <sev/functor_vt.h>
 #include <sev/functor_view.h>
+#include <sev/concurrent_functor_queue.h>
 
 int main()
 {
@@ -125,4 +126,26 @@ int main()
 		func(); // This will now give an empty string, since it was actually moved
 		std::cout << "-"sv << std::endl;
 	}
+	{
+		std::cout << "-->"sv << std::endl;
+		std::string s = "Nice!";
+		sev::ConcurrentFunctorQueue<int(int)> q;
+		q.push([s = std::move(s)](int y) -> int {
+			std::cout << "Called: "sv << s << std::endl;
+			return y + 10;
+		});
+		std::cout << "Added one"sv << std::endl;
+		std::cout << "Should be empty: "sv << s << std::endl;
+		// TODO: call
+		for (int i = 0; i < (64 * 1024); ++i)
+		{
+			q.push([i](int y) -> int {
+				return y + i;
+			});
+		}
+		std::cout << "Added all"sv << std::endl;
+		std::cout << "<--"sv << std::endl;
+	}
 }
+
+/* end of file */

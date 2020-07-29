@@ -107,16 +107,16 @@ public:
 		}), /*Destroy*/([](void *ptr) -> void {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			f->~TFunc();
-		}), /*Invoke*/(TInvoke)([](void *ptr) -> void {
+		}), /*Invoke*/(TInvoke)([](void *ptr, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
-			(*f)();
+			return (*f)(args...);
 		}) }
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
 
-	inline SEV_FunctorVt *raw() const { return &m; }
+	inline const SEV_FunctorVt *raw() const { return &m; }
 
 	inline ptrdiff_t size() const { return m.Size; }
 	inline TRes invoke(void *ptr, TArgs... value) const { return ((TInvoke)m.Invoke)(ptr, value...); }

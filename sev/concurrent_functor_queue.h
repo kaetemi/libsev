@@ -50,14 +50,14 @@ struct SEV_ConcurrentFunctorQueue
 
 };
 
-SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize);
-void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFunctorQueue);
+SEV_LIB SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize);
+SEV_LIB void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFunctorQueue);
 
-void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
-void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
+SEV_LIB void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
+SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 
-void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
-// void SEV_ConcurrentFunctorQueue_callAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *invoke, void *ptr));
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+// SEV_LIB void SEV_ConcurrentFunctorQueue_callAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *invoke, void *ptr));
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -73,33 +73,33 @@ template<class TRes, class... TArgs>
 struct ConcurrentFunctorQueue<TRes(TArgs...)>
 {
 public:
-	inline ConcurrentFunctorQueue(ptrdiff_t blockSize) { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
+	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
 	inline ~ConcurrentFunctorQueue() { SEV_ConcurrentFunctorQueue_release(&m); }
 
 	void push(const FunctorView<TRes(TArgs...)> &fv)
 	{
-		FunctorVt<TRes(TArgs...)> *vt;
+		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		fv.extract(vt, ptr);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt.raw(), ptr, vt.raw()->ConstCopyConstructor);
+		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->ConstCopyConstructor);
 	}
 
 	void push(FunctorView<TRes(TArgs...)> &fv)
 	{
-		FunctorVt<TRes(TArgs...)> *vt;
+		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt.raw(), ptr, vt.raw()->CopyConstructor);
+		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->CopyConstructor);
 	}
 	
 	void push(FunctorView<TRes(TArgs...)> &&fv)
 	{
-		FunctorVt<TRes(TArgs...)> *vt;
+		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt.raw(), ptr, vt.raw()->MoveConstructor);
+		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->MoveConstructor);
 	}
 	
 private:

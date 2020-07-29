@@ -41,15 +41,21 @@ namespace /* anonymous */ {
 struct BlockPreamble
 {
 	uint8_t *NextBlock;
-	// volatile ptrdiff_t WriteIdx;
 };
 
 struct FunctorPreamble
 {
 	volatile ptrdiff_t Ready;
-	SEV_FunctorVt *Vt;
+	const SEV_FunctorVt *Vt;
 	ptrdiff_t Size;
 };
+
+void recursiveRelease(BlockPreamble *blockPreamble)
+{
+	if (blockPreamble->NextBlock)
+		recursiveRelease((BlockPreamble *)blockPreamble->NextBlock);
+	_aligned_free(blockPreamble);
+}
 
 } /* anonymous namespace */
 } /* namespace sev */
@@ -73,9 +79,21 @@ void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t b
 	me->SpareBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write
 	me->ReadIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
 	me->PreWriteIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
+	((sev::BlockPreamble *)me->WriteBlock)->NextBlock = null;
+	((sev::BlockPreamble *)me->SpareBlock)->NextBlock = null;
 }
 
-void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
+{
+	SEV_ASSERT(me->ReadBlock);
+	SEV_ASSERT(me->WriteBlock);
+	// SEV_ASSERT(me->SpareBlock); // Can be null if queue is overfilled
+	SEV_ASSERT(me->SpareBlock != me->ReadBlock);
+	_aligned_free(me->SpareBlock);
+	sev::recursiveRelease((sev::BlockPreamble *)me->ReadBlock);
+}
+
+errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
 	// This function only locks while flipping to the next buffer
 	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
@@ -87,7 +105,7 @@ void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_
 	uint8_t *block = me->WriteBlock;
 	ptrdiff_t nextIdx;
 	bool locked = false;
-	ptrdiff_t prevBlockIdx;
+	ptrdiff_t lockIdx;
 	sev::BlockPreamble *prevBlockPreamble;
 	for (; ;)
 	{
@@ -108,40 +126,51 @@ void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_
 		}
 
 		// We have a lock, are we inside a block?
-		if (nextIdx < blockSize)
+		if (nextIdx <= blockSize)
 		{
 			break; // We have a good allocation, using it!
 		}
 
 		// Writing is now locked, we're safe here until preWriteIdx is written
 		locked = true;
-		prevBlockIdx = idx;
+		lockIdx = nextIdx;
 		prevBlockPreamble = (sev::BlockPreamble *)block;
-		SEV_ASSERT(me->PreWriteIdx == idx); // Can't have changed
+		SEV_ASSERT(me->PreWriteIdx == nextIdx); // Can't have changed since locking
 
 		// Start from the beginning, offset alignment
 		static_assert((SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble)) >= sizeof(sev::BlockPreamble));
 		idx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble); // Block preamble is preceeding
 		nextIdx = idx + sz;
 
-		// Reuse leftover block
-		block = me->SpareBlock;
+		// Switch to next write buffer block
+		block = (uint8_t *)_InterlockedExchangePointer((void *volatile *)(&me->SpareBlock), null); // Get spare and switch to null
 		if (block)
 		{
-			me->SpareBlock = null;
+			// Reuse leftover block
 			SEV_ASSERT(prevBlockPreamble->NextBlock == null); // Can't have been set
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			SEV_ASSERT(blockPreamble->NextBlock == null); // Can't have been set
 			(void)blockPreamble; // Unused warning
 		}
+		else
+		{
+			// Create a new block
+			block = (uint8_t *)_aligned_malloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+			if (!block)
+			{
+				errno_t res = errno;
+				SEV_ASSERT(res);
+				me->PreWriteIdx = lockIdx - sz;
+				if (res) return res;
+				return ENOMEM;
+			}
+		}
 
-		// Create a new block
-		block = (uint8_t *)_aligned_malloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
-		if (!block)
-			throw std::bad_alloc();
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 		blockPreamble->NextBlock = null;
 		// blockPreamble->WriteIdx = idx;
+
+		break;
 	}
 
 	// Write
@@ -156,7 +185,7 @@ void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_
 	if (locked)
 	{
 		// Unlock
-		SEV_ASSERT(me->PreWriteIdx == prevBlockIdx); // Can't have changed
+		SEV_ASSERT(me->PreWriteIdx == lockIdx); // Can't have changed
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 		me->WriteBlock = block;
 		// blockPreamble->WriteIdx = nextIdx;
@@ -166,18 +195,13 @@ void SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, SEV_
 	}
 	else
 	{
+		// Flag ready for reader
 		functorPreamble->Ready = 1;
-
-		// sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-
-		// TODO: Could have a "Ready" flag in the functor preamble instead of the write idx, that way we don't need to lock!
-		// while (_InterlockedCompareExchangePointer((void *volatile *)(&blockPreamble->WriteIdx), (void *)nextIdx, (void *)idx) != (void *)idx); // Increment block write idx in the proper order
 	}
-}
 
-void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
-{
+	SEV_ASSERT(nextIdx <= me->BlockSize);
 
+	return 0;
 }
 
 /* end of file */
