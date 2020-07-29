@@ -46,7 +46,7 @@ int main()
 			std::cout << "Hello world "sv << a << std::endl;
 		};
 		static_assert(sizeof(b) == sizeof(func));
-		sev::FunctorVt<void()>(func).Invoke(&b);
+		sev::FunctorVt<void()>(func).invoke(&b);
 	}
 	{
 		std::string a = "Five";

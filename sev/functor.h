@@ -95,8 +95,8 @@ public:
 	{
 		SEV_ASSERT(vt);
 		m_Vt = vt;
-		void *p = p_allocPtr(sizeof(vt->Size)); // Allocate space
-		vt->CopyConstructor(p, ptr);
+		void *p = p_allocPtr(sizeof(vt->size())); // Allocate space
+		vt->copyConstructor(p, ptr);
 	}
 
 	// Construct from vtable and data pointer, use move constructor when movable is set
@@ -104,9 +104,9 @@ public:
 	{
 		SEV_ASSERT(vt);
 		m_Vt = vt;
-		void *p = p_allocPtr(sizeof(vt->Size)); // Allocate space
-		if (movable) vt->MoveConstructor(p, ptr);
-		else vt->CopyConstructor(p, ptr);
+		void *p = p_allocPtr(sizeof(vt->size())); // Allocate space
+		if (movable) vt->moveConstructor(p, ptr);
+		else vt->copyConstructor(p, ptr);
 	}
 
 	inline ~Functor() noexcept
@@ -117,31 +117,31 @@ public:
 
 	inline TRes operator()(TArgs... value)
 	{
-		return m_Vt->Invoke(p_ptr(), value...);
+		return m_Vt->invoke(p_ptr(), value...);
 	}
 
 	inline Functor(const Functor &other)
 	{
 		m_Vt = other.m_Vt;
-		void *ptr = p_allocPtr(m_Vt->Size); // Allocate space
-		m_Vt->CopyConstructor(ptr, other.p_ptr());
+		void *ptr = p_allocPtr(m_Vt->size()); // Allocate space
+		m_Vt->copyConstructor(ptr, other.p_ptr());
 	}
 
 	inline Functor(Functor &other)
 	{
 		m_Vt = other.m_Vt;
-		void *ptr = p_allocPtr(m_Vt->Size); // Allocate space
-		m_Vt->CopyConstructor(ptr, other.p_ptr());
+		void *ptr = p_allocPtr(m_Vt->size()); // Allocate space
+		m_Vt->copyConstructor(ptr, other.p_ptr());
 	}
 
 	inline Functor(Functor &&other) noexcept
 	{
 		static const TVt vtable;
 		m_Vt = other.m_Vt;
-		if (m_Vt->Size > c_Capacity)
+		if (m_Vt->size() > c_Capacity)
 			m_Storage.Ptr = other.m_Storage.Ptr; // Just move the ptr
 		else
-			m_Vt->MoveConstructor(m_Storage.Data, other.m_Storage.Data); // Move the data
+			m_Vt->moveConstructor(m_Storage.Data, other.m_Storage.Data); // Move the data
 		other.m_Vt = &vtable; // Empty other vtable
 	}
 
@@ -174,12 +174,12 @@ public:
 private:
 	inline void *p_ptr() noexcept
 	{
-		return m_Vt->Size > c_Capacity ? m_Storage.Ptr : m_Storage.Data;
+		return m_Vt->size() > c_Capacity ? m_Storage.Ptr : m_Storage.Data;
 	}
 
 	inline const void *p_ptr() const noexcept
 	{
-		return m_Vt->Size > c_Capacity ? m_Storage.Ptr : m_Storage.Data;
+		return m_Vt->size() > c_Capacity ? m_Storage.Ptr : m_Storage.Data;
 	}
 
 	inline void *p_allocPtr(ptrdiff_t size)
@@ -197,14 +197,14 @@ private:
 
 	inline void p_destroyPtr() noexcept
 	{
-		if (m_Vt->Size > c_Capacity)
+		if (m_Vt->size() > c_Capacity)
 		{
-			m_Vt->Destroy(m_Storage.Ptr);
+			m_Vt->destroy(m_Storage.Ptr);
 			alignedFree(m_Storage.Ptr);
 		}
 		else
 		{
-			m_Vt->Destroy(m_Storage.Data);
+			m_Vt->destroy(m_Storage.Data);
 		}
 	}
 

@@ -136,7 +136,7 @@ public:
 
 	inline TRes operator()(TArgs... value)
 	{
-		return m_Vt->Invoke(m_Ptr, value...);
+		return m_Vt->invoke(m_Ptr, value...);
 	}
 
 	inline bool movable() const
