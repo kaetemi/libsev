@@ -42,11 +42,12 @@ extern "C" {
 struct SEV_FunctorVt
 {
 	ptrdiff_t Size;
-	void *Invoke;
-	void(*Destroy)(void *ptr);
 	void(*ConstCopyConstructor)(void *ptr, const void *other);
 	void(*CopyConstructor)(void *ptr, void *other);
 	void(*MoveConstructor)(void *ptr, void *other);
+	void(*Destroy)(void *ptr);
+
+	void *Invoke;
 
 };
 
@@ -72,11 +73,11 @@ public:
 	
 	explicit constexpr FunctorVt() noexcept
 		: m{ /*Size*/(0)
-		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); }))
-		, /*Destroy*/([](void *) -> void {})
 		, /*ConstCopyConstructor*/([](void *, const void *) -> void {})
 		, /*CopyConstructor*/([](void *, void *) -> void {})
-		, /*MoveConstructor*/([](void *, void *) -> void {}) }
+		, /*MoveConstructor*/([](void *, void *) -> void {})
+		, /*Destroy*/([](void *) -> void {})
+		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); })) }
 	{
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
@@ -90,13 +91,7 @@ public:
 	template<class TFunc>
 	explicit constexpr FunctorVt(const TFunc &) noexcept
 		: m{ /*Size*/(sizeof(TFunc))
-		, /*Invoke*/(TInvoke)([](void *ptr) -> void {
-			TFunc *f = reinterpret_cast<TFunc *>(ptr);
-			(*f)();
-		}), /*Destroy*/([](void *ptr) -> void {
-			TFunc *f = reinterpret_cast<TFunc *>(ptr);
-			f->~TFunc();
-		}), /*ConstCopyConstructor*/([](void *ptr, const void *other) -> void {
+		, /*ConstCopyConstructor*/([](void *ptr, const void *other) -> void {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			const TFunc *o = reinterpret_cast<const TFunc *>(other);
 			new (f) TFunc(*o);
@@ -109,6 +104,12 @@ public:
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			TFunc *o = reinterpret_cast<TFunc *>(other);
 			new (f) TFunc(move(*o));
+		}), /*Destroy*/([](void *ptr) -> void {
+			TFunc *f = reinterpret_cast<TFunc *>(ptr);
+			f->~TFunc();
+		}), /*Invoke*/(TInvoke)([](void *ptr) -> void {
+			TFunc *f = reinterpret_cast<TFunc *>(ptr);
+			(*f)();
 		}) }
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
