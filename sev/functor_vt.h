@@ -39,9 +39,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
-struct SEV_FunctorVtRaw
+struct SEV_FunctorVt
 {
-public:
 	ptrdiff_t Size;
 	void *Invoke;
 	void(*Destroy)(void *ptr);
@@ -58,8 +57,6 @@ public:
 #ifdef __cplusplus
 
 namespace sev {
-
-using FunctorVtRaw = SEV_FunctorVtRaw;
 
 template<class TFn>
 struct FunctorVt;
@@ -81,13 +78,13 @@ public:
 		, /*CopyConstructor*/([](void *, void *) -> void {})
 		, /*MoveConstructor*/([](void *, void *) -> void {}) }
 	{
-		static_assert(sizeof(FunctorVt) == sizeof(FunctorVtRaw));
+		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
 
-	explicit constexpr FunctorVt(FunctorVtRaw &&raw) noexcept
+	explicit constexpr FunctorVt(SEV_FunctorVt &&raw) noexcept
 		: m(raw)
 	{
-		static_assert(sizeof(FunctorVt) == sizeof(FunctorVtRaw));
+		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
 
 	template<class TFunc>
@@ -115,10 +112,10 @@ public:
 		}) }
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
-		static_assert(sizeof(FunctorVt) == sizeof(FunctorVtRaw));
+		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
 
-	inline FunctorVtRaw &raw() const { return m; }
+	inline SEV_FunctorVt *raw() const { return &m; }
 
 	inline ptrdiff_t size() const { return m.Size; }
 	inline TRes invoke(void *ptr, TArgs... value) const { return ((TInvoke)m.Invoke)(ptr, value...); }
@@ -138,7 +135,7 @@ public:
 	*/
 
 private:
-	const FunctorVtRaw m;
+	const SEV_FunctorVt m;
 
 public:
 	FunctorVt(const FunctorVt &) = delete;

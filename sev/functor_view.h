@@ -134,6 +134,24 @@ public:
 		return TFunctor(m_Vt, m_Ptr, false);
 	}
 
+	inline void extract(const TVt *&vt, void *&ptr, bool &movable, bool forward = false)
+	{
+		movable = m_Movable && forward;
+		vt = m_Vt;
+		ptr = m_Ptr;
+		if (movable)
+		{
+			static const auto vtable = TVt();
+			m_Vt = &vtable; // This view is no longer valid
+		}
+	}
+
+	inline void extract(const TVt *&vt, const void *&ptr) const // Movable is always false in this case, only copyable
+	{
+		vt = m_Vt;
+		ptr = m_Ptr;
+	}
+
 	inline TRes operator()(TArgs... value)
 	{
 		return m_Vt->invoke(m_Ptr, value...);
@@ -142,6 +160,16 @@ public:
 	inline bool movable() const
 	{
 		return m_Movable;
+	}
+
+	inline void *ptr()
+	{
+		return m_Ptr;
+	}
+
+	inline const void *ptr() const
+	{
+		return m_Ptr;
 	}
 
 	inline const TVt *vt() const
