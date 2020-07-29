@@ -44,39 +44,11 @@ Under normal circumstances, your application should *never* throw an exception.
 #define SEV_WIN32_EXCEPTION_H
 
 #include "platform.h"
+#include "exception.h"
 
 #ifdef __cplusplus
 
 namespace sev {
-
-struct SEV_LIB Exception
-{
-public:
-	struct SEV_LIB StringView
-	{
-	public:
-		StringView() : Data(null), Size(0) { }
-		inline StringView(std::string_view str) : Data(str.data()), Size(str.size()) { }
-		inline std::string_view sv() const { return std::string_view(Data, Size); }
-		const char *Data;
-		ptrdiff_t Size;
-	};
-
-	Exception() noexcept;
-	Exception(std::string_view str) noexcept;
-	Exception(std::string_view litStr, int) noexcept;
-	virtual ~Exception() noexcept;
-
-	Exception(const Exception &other) noexcept;
-	Exception &operator=(Exception const &other) noexcept;
-
-	[[nodiscard]] virtual char const *what() const;
-
-private:
-	StringView m_What;
-	bool m_Delete;
-
-};
 
 struct SEV_LIB Win32Exception : Exception
 {

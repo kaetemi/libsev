@@ -85,5 +85,6 @@ ADD_SUBDIRECTORY(sev_static)
 ADD_SUBDIRECTORY(sev_lite)
 
 ADD_SUBDIRECTORY(test_dev)
+ADD_SUBDIRECTORY(test_dyn)
 
 ########################################################################

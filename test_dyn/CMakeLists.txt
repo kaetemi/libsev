@@ -1,0 +1,18 @@
+
+FILE(GLOB SRCS *.cpp)
+FILE(GLOB HDRS *.h)
+FILE(GLOB INLS *.inl)
+
+SOURCE_GROUP("" FILES ${SRCS} ${HDRS} ${INLS})
+
+ADD_EXECUTABLE(test_dyn
+  ${SRCS}
+  ${HDRS}
+  ${INLS}
+)
+
+TARGET_LINK_LIBRARIES(test_dyn
+  sev
+)
+
+#ADD_DEFINITIONS(-DSEV_LIB_STATIC)

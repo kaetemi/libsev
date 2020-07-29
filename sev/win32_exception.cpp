@@ -145,57 +145,6 @@ std::string_view copyString(const std::string_view str) noexcept
 
 }
 
-Exception::Exception() noexcept : m_Delete(false)
-{
-
-}
-
-Exception::Exception(std::string_view str) noexcept : m_What(copyString(std::string_view(str.data(), strlen(str.data())))), m_Delete(true)
-{
-
-}
-
-Exception::Exception(std::string_view litStr, int) noexcept : m_What(litStr), m_Delete(false)
-{
-
-}
-
-Exception::~Exception() noexcept
-{
-	if (m_Delete)
-		delete[] m_What.Data;
-}
-
-Exception::Exception(const Exception &other) noexcept
-{
-	if (other.m_Delete)
-	{
-		m_What = copyString(other.m_What.sv());
-		m_Delete = true;
-	}
-	else
-	{
-		m_What.Data = other.m_What.Data;
-		m_What.Size = other.m_What.Size;
-		m_Delete = false;
-	}
-}
-
-Exception &Exception::operator=(Exception const &other) noexcept
-{
-	if (this != &other) 
-	{
-		this->~Exception();
-		new (this) Exception(other);
-	}
-	return *this;
-}
-
-[[nodiscard]] char const *Exception::what() const
-{
-	return m_What.Data ? m_What.Data : "Unknown SEv exception";
-}
-
 Win32Exception::Win32Exception(const HRESULT hr, const DWORD errorCode, const StringView file, const int line) noexcept
 	: base("Unknown Win32 exception", 1),
 	m_HResult(hr), m_ErrorCode(errorCode ? errorCode : (HRESULT_FACILITY(hr) == FACILITY_WINDOWS ? HRESULT_CODE(hr) : hr)), m_File(file), m_Line(line),

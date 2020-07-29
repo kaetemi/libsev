@@ -42,6 +42,27 @@ Start with a proof of concept FunctionList.
 But, important... data alignment!
 [pad] vtable rpadded-size [align] rpadded-data
 
+Can pass as vtable + pointer (FunctionView) for IEventLoop, rather than as string-like copy... But with movable flag?
+How to pass function cleanly through a virtual interface without causing memory allocations?
+How to pass a lambda into a virtual interface without casting it to std::function?
+Basically, FunctionView... would be simpler! But, can't be safely casted to std::function.....
+
+virtual void xyzzy(const FunctionVTable &vtable, void *ptr, bool movable);
+
+template<TFn>
+void xyzzy(TFn &&fn)
+{
+	static const FunctionVTable vtable(FunctionWrapper<fn>);
+	xyzzy(vtable, &ptr, true);
+}
+
+template<TFn>
+void xyzzy(const TFn &fn)
+{
+	static const FunctionVTable vtable(FunctionWrapper<fn>);
+	xyzzy(vtable, &ptr, false);
+}
+
 */
 
 #ifdef __cplusplus
