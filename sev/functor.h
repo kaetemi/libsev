@@ -141,7 +141,10 @@ public:
 		if (m_Vt->size() > c_Capacity)
 			m_Storage.Ptr = other.m_Storage.Ptr; // Just move the ptr
 		else
+		{
 			m_Vt->moveConstructor(m_Storage.Data, other.m_Storage.Data); // Move the data
+			m_Vt->destroy(other.m_Storage.Data); // Destroy other data, since vtable will be empty
+		}
 		other.m_Vt = &vtable; // Empty other vtable
 	}
 

@@ -174,7 +174,7 @@ int main()
 		z.toFunctor(false);
 		z.toFunctor(false);
 		z.toFunctor(false); // FIXME: Functor is not releasing correctly?!
-		sev::Functor<void()> y = z.toFunctor(false);
+		sev::Functor<void()> y = z.toFunctor(true);
 		{
 			ptrdiff_t z = s_AllocationCount;
 			std::cout << "Local allocation count (after, should be the same): "sv << z << "\n"sv; // 2
@@ -203,6 +203,7 @@ int main()
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
+	return EXIT_SUCCESS;;
 	{
 		std::cout << "-->"sv << std::endl;
 		std::string s = "Nice!";

@@ -92,19 +92,23 @@ public:
 	explicit constexpr FunctorVt(const TFunc &) noexcept
 		: m{ /*Size*/(sizeof(TFunc))
 		, /*ConstCopyConstructor*/([](void *ptr, const void *other) -> void {
+			//printf("[[ConstCopyConstructor]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			const TFunc *o = reinterpret_cast<const TFunc *>(other);
 			new (f) TFunc(*o);
 		}), /*CopyConstructor*/([](void *ptr, void *other) -> void {
+			//printf("[[CopyConstructor]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			TFunc *o = reinterpret_cast<TFunc *>(other);
 			new (f) TFunc(*o);
 			})
 		, /*MoveConstructor*/([](void *ptr, void *other) -> void {
+			//printf("[[MoveConstructor]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			TFunc *o = reinterpret_cast<TFunc *>(other);
 			new (f) TFunc(move(*o));
 		}), /*Destroy*/([](void *ptr) -> void {
+			//printf("[[Destroy]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			f->~TFunc();
 		}), /*Invoke*/(TInvoke)([](void *ptr, TArgs... args) -> TRes {
