@@ -168,7 +168,6 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 		blockPreamble->NextBlock = null;
-		// blockPreamble->WriteIdx = idx;
 
 		break;
 	}
@@ -188,7 +187,6 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 		SEV_ASSERT(me->PreWriteIdx == lockIdx); // Can't have changed
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 		me->WriteBlock = block;
-		// blockPreamble->WriteIdx = nextIdx;
 		functorPreamble->Ready = 1;
 		prevBlockPreamble->NextBlock = block; // Allow read
 		me->PreWriteIdx = nextIdx; // Unlock write
