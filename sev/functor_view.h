@@ -94,9 +94,14 @@ public:
 		return m_Vt->Invoke(m_Ptr, value...);
 	}
 
-	inline bool movable() const noexcept
+	inline bool movable() const
 	{
 		return m_Movable;
+	}
+
+	inline const TVt *vt() const
+	{
+		return m_Vt;
 	}
 
 	FunctorView(const FunctorView &other) noexcept
