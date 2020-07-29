@@ -98,4 +98,31 @@ int main()
 			std::cout << "Exception OK!"sv << std::endl;
 		}
 	}
+	{
+		std::string a = "Five";
+		auto func = [a]() -> void {
+			std::cout << "5 = "sv << a << std::endl;
+		};
+		sev::FunctorView<void()> z(std::move(func));
+		std::cout << "Movable: "sv << (z.movable() ? "YES"sv : "NO"sv) << std::endl;
+		z();
+		std::cout << "-"sv << std::endl;
+		std::cout << "Should not yet be empty: "sv;
+		func(); // Is not actually moved yet until toFunctor is called
+		sev::Functor<void()> y = z.toFunctor(true);
+		y();
+		try
+		{
+			z(); // This one was moved out!
+			std::cout << "NOT OK"sv << std::endl;
+		}
+		catch (std::bad_function_call &ex)
+		{
+			std::cout << ex.what() << std::endl;
+			std::cout << "Exception OK!"sv << std::endl;
+		}
+		std::cout << "Should be empty: "sv;
+		func(); // This will now give an empty string, since it was actually moved
+		std::cout << "-"sv << std::endl;
+	}
 }

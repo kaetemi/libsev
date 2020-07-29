@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "platform.h"
 #include "exception.h"
+#include "functor.h"
 
 #ifdef __cplusplus
 
@@ -53,6 +54,7 @@ struct FunctorView<TRes(TArgs...)>
 {
 private:
 	using TVt = FunctorVt<TRes(TArgs...)>;
+	using TFunctor = Functor<TRes(TArgs...)>;
 
 public:
 #pragma warning(push)
@@ -60,7 +62,7 @@ public:
 #ifdef __INTELLISENSE__
 #pragma diag_suppress 2398
 #endif
-	FunctorView() noexcept
+	inline FunctorView() noexcept
 	{
 		static const auto vtable = TVt();
 		m_Vt = vtable;
@@ -94,8 +96,43 @@ public:
 		m_Movable = true;
 	}
 
-	// TODO: Specialized constructor from Functor
-	// TODO: Specialized toFunctor
+	inline FunctorView(const TFunctor &fn) noexcept
+	{
+		m_Vt = fn.vt();
+		m_Ptr = fn.ptr();
+		m_Movable = false;
+	}
+
+	inline FunctorView(TFunctor &fn) noexcept
+	{
+		m_Vt = fn.vt();
+		m_Ptr = fn.ptr();
+		m_Movable = false;
+	}
+
+	inline FunctorView(TFunctor &&fn) noexcept
+	{
+		m_Vt = fn.vt();
+		m_Ptr = fn.ptr();
+		m_Movable = true;
+	}
+
+	inline TFunctor toFunctor(const bool forward = false)
+	{
+		bool movable = m_Movable && forward;
+		TFunctor fn(m_Vt, m_Ptr, movable);
+		if (movable)
+		{
+			static const auto vtable = TVt();
+			m_Vt = &vtable; // This view is no longer valid
+		}
+		return fn;
+	}
+
+	inline TFunctor toFunctor() const
+	{
+		return TFunctor(m_Vt, m_Ptr, false);
+	}
 
 	inline TRes operator()(TArgs... value)
 	{
@@ -112,21 +149,21 @@ public:
 		return m_Vt;
 	}
 
-	FunctorView(const FunctorView &other) noexcept
+	inline FunctorView(const FunctorView &other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;
 	}
 
-	FunctorView(FunctorView &other) noexcept
+	inline FunctorView(FunctorView &other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;
 	}
 
-	FunctorView(FunctorView &&other) noexcept
+	inline FunctorView(FunctorView &&other) noexcept
 		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr), m_Movable(other.m_Movable)
 	{
 		// When moving a movable, the other vtable gets reset to the default
@@ -134,26 +171,17 @@ public:
 		other.m_Vt = &vtable;
 	}
 
-	FunctorView &operator= (const FunctorView &other) noexcept
+	template<typename T = FunctorView>
+	T &operator= (T &&other) noexcept
 	{
 		if (*this != other)
 		{
 			~FunctorView();
-			new (this) FunctorView(other);
-		}
-	}
-
-	FunctorView &operator= (FunctorView &&other) noexcept
-	{
-		if (*this != other)
-		{
-			~FunctorView();
-			new (this) FunctorView(move(other));
+			new (this) FunctorView(forward(other));
 		}
 	}
 
 private:
-	// friend struct Functor<TRes(TArgs...)>;
 	const TVt *m_Vt;
 	void *m_Ptr;
 	mutable bool m_Movable;

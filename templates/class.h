@@ -30,8 +30,16 @@ typedef void NMSP_ClassName;
 
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 SEV_ClassName *NMSP_ClassName_create();
 void NMSP_ClassName_destroy(NMSP_ClassName *className);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* #ifndef NMSP_CLASSNAME_H */
 
