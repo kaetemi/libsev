@@ -60,6 +60,8 @@ void recursiveRelease(BlockPreamble *blockPreamble)
 } /* anonymous namespace */
 } /* namespace sev */
 
+#define SEV_BLOCK_PREAMBLE_SIZE (SEV_FUNCTOR_ALIGNED(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble)))
+
 SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize)
 {
 	static_assert(sizeof(SEV_ConcurrentFunctorQueue) == sizeof(sev::ConcurrentFunctorQueue<void()>));
@@ -73,12 +75,13 @@ void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFu
 
 void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
 {
+	static_assert(SEV_BLOCK_PREAMBLE_SIZE == SEV_FUNCTOR_ALIGN); // Just for testing, it should be exactly this now. It can be any multiple
 	me->BlockSize = blockSize;
 	me->ReadBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN);
 	me->WriteBlock = me->ReadBlock;
 	me->SpareBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write
-	me->ReadIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
-	me->PreWriteIdx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble);
+	me->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
+	me->PreWriteIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	((sev::BlockPreamble *)me->WriteBlock)->NextBlock = null;
 	((sev::BlockPreamble *)me->SpareBlock)->NextBlock = null;
 }
@@ -98,7 +101,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 	// This function only locks while flipping to the next buffer
 	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
 
-	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_FUNCTOR_ALIGN);
+	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
 	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(vt->Size + sizeof(sev::FunctorPreamble)); // Pad
 	const ptrdiff_t blockSize = me->BlockSize;
 	ptrdiff_t idx = me->PreWriteIdx;
@@ -138,8 +141,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 		SEV_ASSERT(me->PreWriteIdx == nextIdx); // Can't have changed since locking
 
 		// Start from the beginning, offset alignment
-		static_assert((SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble)) >= sizeof(sev::BlockPreamble));
-		idx = SEV_FUNCTOR_ALIGN - sizeof(sev::FunctorPreamble); // Block preamble is preceeding
+		static_assert((SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)) >= sizeof(sev::BlockPreamble));
+		idx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble); // Block preamble is preceeding
 		nextIdx = idx + sz;
 
 		// Switch to next write buffer block
