@@ -115,7 +115,7 @@ using std::forward;
 
 // Assert
 #ifdef SEV_DEBUG
-#	define SEV_ASSERT(cond) do { if (!cond) SEV_DEBUG_BREAK(); } while (false)
+#	define SEV_ASSERT(cond) do { if (!(cond)) SEV_DEBUG_BREAK(); } while (false)
 #else
 #	define SEV_ASSERT(cond) do { } while (false)
 #endif
