@@ -86,8 +86,9 @@ using namespace std::string_view_literals;
 using std::strong_ordering;
 #endif
 using std::move;
-using std::nothrow;
 using std::forward;
+using std::nothrow_t;
+using std::nothrow;
 
 // Include GSL
 // auto _ = gsl::finally([&] { delete xyz; });

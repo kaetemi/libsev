@@ -38,8 +38,40 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/functor_view.h>
 #include <sev/concurrent_functor_queue.h>
 
+static std::atomic_ptrdiff_t s_AllocationCount;
+
+// Override global C++ allocation for debug purpose
+void *operator new(size_t sz)
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	void *ptr = _aligned_malloc(sz, 32);
+	if (ptr)
+		return ptr;
+	else
+		throw std::bad_alloc{};
+}
+
+void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	return _aligned_malloc(sz, 32);
+}
+
+void operator delete(void *ptr) noexcept
+{
+	// printf("-[[[Free pointer]]]-");
+	_aligned_free(ptr);
+	s_AllocationCount -= 1;
+}
+
 int main()
 {
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
+	}
 	{
 		int a = 5;
 		int b = 42;
@@ -48,6 +80,10 @@ int main()
 		};
 		static_assert(sizeof(b) == sizeof(func));
 		sev::FunctorVt<void()>(func).invoke(&b);
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
 	{
 		std::string a = "Five";
@@ -64,6 +100,10 @@ int main()
 		z();
 	}
 	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
+	}
+	{
 		std::string a = "Five";
 		auto func = [a]() -> void {
 			std::cout << "5 = "sv << a << std::endl;
@@ -75,6 +115,10 @@ int main()
 		sev::FunctorView<void()> y(z);
 		y();
 		z();
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
 	{
 		std::string a = "Five";
@@ -100,17 +144,42 @@ int main()
 		}
 	}
 	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
+	}
+	{
 		std::string a = "Five";
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count (string): "sv << z << "\n"sv;
+		}
 		auto func = [a]() -> void {
 			std::cout << "5 = "sv << a << std::endl;
 		};
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count (string and lambda): "sv << z << "\n"sv;
+		}
 		sev::FunctorView<void()> z(std::move(func));
 		std::cout << "Movable: "sv << (z.movable() ? "YES"sv : "NO"sv) << std::endl;
 		z();
 		std::cout << "-"sv << std::endl;
 		std::cout << "Should not yet be empty: "sv;
 		func(); // Is not actually moved yet until toFunctor is called
-		sev::Functor<void()> y = z.toFunctor(true);
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count (before): "sv << z << "\n"sv; // 2
+		}
+		z.toFunctor(false);
+		z.toFunctor(false);
+		z.toFunctor(false);
+		z.toFunctor(false); // FIXME: Functor is not releasing correctly?!
+		sev::Functor<void()> y = z.toFunctor(false);
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count (after, should be the same): "sv << z << "\n"sv; // 2
+		}
+		/*
 		y();
 		try
 		{
@@ -122,19 +191,35 @@ int main()
 			std::cout << ex.what() << std::endl;
 			std::cout << "Exception OK!"sv << std::endl;
 		}
-		std::cout << "Should be empty: "sv;
+		std::cout << "Should be empty: "sv;*/
 		func(); // This will now give an empty string, since it was actually moved
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		std::cout << "-"sv << std::endl;
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
 	{
 		std::cout << "-->"sv << std::endl;
 		std::string s = "Nice!";
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		sev::ConcurrentFunctorQueue<int(int)> q;
 		q.push([s = std::move(s)](int y) -> int {
 			std::cout << "Called: "sv << s << std::endl;
 			return y + 10;
 		});
 		std::cout << "Added one"sv << std::endl;
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		std::cout << "Should be empty: "sv << s << std::endl;
 		// TODO: call
 		for (int i = 0; i < (64 * 1024); ++i)
@@ -144,7 +229,15 @@ int main()
 			});
 		}
 		std::cout << "Added all"sv << std::endl;
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		std::cout << "<--"sv << std::endl;
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
 }
 

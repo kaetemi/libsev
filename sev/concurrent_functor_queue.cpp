@@ -33,7 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SEV_FUNCTOR_ALIGN_MODMASK ((ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
 #define SEV_FUNCTOR_ALIGN_MASK (~(ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
-#define SEV_FUNCTOR_ALIGNED(value) (((value) + SEV_FUNCTOR_ALIGN_MODMASK) & SEV_FUNCTOR_ALIGN_MASK)
+#define SEV_FUNCTOR_ALIGNED(value) ((ptrdiff_t)(((value) + SEV_FUNCTOR_ALIGN_MODMASK) & SEV_FUNCTOR_ALIGN_MASK))
 
 namespace sev {
 namespace /* anonymous */ {
@@ -50,12 +50,14 @@ struct FunctorPreamble
 	ptrdiff_t Size;
 };
 
+/*
 void recursiveRelease(BlockPreamble *blockPreamble)
 {
 	if (blockPreamble->NextBlock)
 		recursiveRelease((BlockPreamble *)blockPreamble->NextBlock);
 	_aligned_free(blockPreamble);
 }
+*/
 
 } /* anonymous namespace */
 } /* namespace sev */
@@ -65,7 +67,17 @@ void recursiveRelease(BlockPreamble *blockPreamble)
 SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize)
 {
 	static_assert(sizeof(SEV_ConcurrentFunctorQueue) == sizeof(sev::ConcurrentFunctorQueue<void()>));
-	return (SEV_ConcurrentFunctorQueue *)new sev::ConcurrentFunctorQueue<void()>(blockSize);
+	SEV_ConcurrentFunctorQueue *concurrentFunctorQueue = (SEV_ConcurrentFunctorQueue *)new (nothrow) sev::ConcurrentFunctorQueue<void()>(nothrow, blockSize);
+	if (!concurrentFunctorQueue)
+	{
+		return null;
+	}
+	if (!concurrentFunctorQueue->ReadBlock) // ENOMEM
+	{
+		delete (sev::ConcurrentFunctorQueue<void()> *)concurrentFunctorQueue;
+		return null;
+	}
+	return concurrentFunctorQueue;
 }
 
 void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFunctorQueue)
@@ -73,37 +85,76 @@ void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFu
 	delete (sev::ConcurrentFunctorQueue<void()> *)concurrentFunctorQueue;
 }
 
-void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
+errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
 {
 	static_assert(SEV_BLOCK_PREAMBLE_SIZE == SEV_FUNCTOR_ALIGN); // Just for testing, it should be exactly this now. It can be any multiple
 	me->BlockSize = blockSize;
 	me->ReadBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN);
+	if (!me->ReadBlock)
+	{
+		me->WriteBlock = null;
+		me->SpareBlock = null;
+		return ENOMEM;
+	}
 	me->WriteBlock = me->ReadBlock;
-	me->SpareBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write
+	me->SpareBlock = (uint8_t *)_aligned_malloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write (no need to check null)
 	me->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	me->PreWriteIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	((sev::BlockPreamble *)me->WriteBlock)->NextBlock = null;
-	((sev::BlockPreamble *)me->SpareBlock)->NextBlock = null;
+	for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
+		((sev::FunctorPreamble *)&me->WriteBlock[i])->Ready = 0;
+	if (me->SpareBlock)
+	{
+		((sev::BlockPreamble *)me->SpareBlock)->NextBlock = null;
+		for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
+			((sev::FunctorPreamble *)&me->SpareBlock[i])->Ready = 0;
+	}
+	return 0;
 }
 
 void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 {
-	SEV_ASSERT(me->ReadBlock);
-	SEV_ASSERT(me->WriteBlock);
-	// SEV_ASSERT(me->SpareBlock); // Can be null if queue is overfilled
-	SEV_ASSERT(me->SpareBlock != me->ReadBlock);
+	// Do not release while threads are still accessing this object!
+
 	_aligned_free(me->SpareBlock);
-	sev::recursiveRelease((sev::BlockPreamble *)me->ReadBlock);
+#ifdef SEV_DEBUG
+	me->SpareBlock = null;
+#endif
+	ptrdiff_t idx = me->ReadIdx;
+	uint8_t *block = me->ReadBlock;
+	const ptrdiff_t blockSize = me->BlockSize;
+#ifdef SEV_DEBUG
+	me->ReadBlock = null;
+#endif
+	while (block)
+	{
+		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
+		for (ptrdiff_t i = idx; i < blockSize; i += ((sev::FunctorPreamble *)(&block[i]))->Size)
+		{
+			ptrdiff_t ptrIdx = i + sizeof(sev::FunctorPreamble);
+			sev::FunctorPreamble *functorPreamble = (sev::FunctorPreamble *)(&block[i]);
+			if (!functorPreamble->Ready)
+				break; // No more remaining functors
+			functorPreamble->Vt->Destroy(&block[ptrIdx]);
+		}
+		uint8_t *nextBlock = blockPreamble->NextBlock;
+		_aligned_free(block);
+		block = nextBlock;
+		idx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
+	}
 }
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
 	// This function only locks while flipping to the next buffer
 	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
+	// FIXME: Blocks need to be cleared... (at least the Ready flag on all alignment boundaries...)
 
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
 	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(vt->Size + sizeof(sev::FunctorPreamble)); // Pad
 	const ptrdiff_t blockSize = me->BlockSize;
+	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockSize)
+		return ENOMEM;
 	ptrdiff_t idx = me->PreWriteIdx;
 	uint8_t *block = me->WriteBlock;
 	ptrdiff_t nextIdx;
@@ -167,6 +218,9 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 				if (res) return res;
 				return ENOMEM;
 			}
+			((sev::BlockPreamble *)block)->NextBlock = null;
+			for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
+				((sev::FunctorPreamble *)&block[i])->Ready = 0;
 		}
 
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;

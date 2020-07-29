@@ -27,6 +27,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+/*
+
+Concurrent queue for arbitrary-sized functors with a fixed-size block allocator.
+
+*/
+
 #pragma once
 #ifndef SEV_CONCURRENT_FUNCTOR_QUEUE_H
 #define SEV_CONCURRENT_FUNCTOR_QUEUE_H
@@ -53,7 +59,7 @@ struct SEV_ConcurrentFunctorQueue
 SEV_LIB SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize);
 SEV_LIB void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFunctorQueue);
 
-SEV_LIB void SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
 SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
@@ -73,33 +79,37 @@ template<class TRes, class... TArgs>
 struct ConcurrentFunctorQueue<TRes(TArgs...)>
 {
 public:
-	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
+	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) { if (SEV_ConcurrentFunctorQueue_init(&m, blockSize)) throw std::bad_alloc(); }
+	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
 	inline ~ConcurrentFunctorQueue() { SEV_ConcurrentFunctorQueue_release(&m); }
 
-	void push(const FunctorView<TRes(TArgs...)> &fv)
+	inline void push(const FunctorView<TRes(TArgs...)> &fv)
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		fv.extract(vt, ptr);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->ConstCopyConstructor);
+		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->ConstCopyConstructor))
+			throw std::bad_alloc();
 	}
 
-	void push(FunctorView<TRes(TArgs...)> &fv)
+	inline void push(FunctorView<TRes(TArgs...)> &fv)
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->CopyConstructor);
+		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->CopyConstructor))
+			throw std::bad_alloc();
 	}
 	
-	void push(FunctorView<TRes(TArgs...)> &&fv)
+	inline void push(FunctorView<TRes(TArgs...)> &&fv)
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->MoveConstructor);
+		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->MoveConstructor))
+			throw std::bad_alloc();
 	}
 	
 private:
