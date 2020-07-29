@@ -203,7 +203,7 @@ int main()
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
-	return EXIT_SUCCESS;;
+	// return EXIT_SUCCESS;;
 	{
 		std::cout << "-->"sv << std::endl;
 		std::string s = "Nice!";
@@ -223,10 +223,13 @@ int main()
 		}
 		std::cout << "Should be empty: "sv << s << std::endl;
 		// TODO: call
+		std::string ls = "This is a super duper very long string";
 		for (int i = 0; i < (64 * 1024); ++i)
 		{
-			q.push([i](int y) -> int {
-				return y + i;
+			q.push([ls, i](int y) -> int {
+				if (ls[0] == 'T')
+					return y + i;
+				return -1;
 			});
 		}
 		std::cout << "Added all"sv << std::endl;
