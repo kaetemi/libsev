@@ -36,6 +36,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef __cplusplus
 
+/*
+
+TODO: `PlacementFunctor`: Functor with external storage that operates like a placement new operator?
+
+NOTE: In the functor queue, multiple functors maybe calling simultaneously. It will directly use the memory of the queue, so the block will only be recycled when none of them are 'in call'.
+
+*/
+
 namespace sev {
 
 template<class TFn>
