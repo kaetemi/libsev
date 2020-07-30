@@ -334,12 +334,12 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args)
 {
 	typedef void(*TFn)(void *ptr, void *args);
-	return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(me, [](void *args, void *f, void *ptr) -> void {
+	return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(me, [](void *args, void *ptr, void *f) -> void {
 		((TFn)f)(ptr, args);
 	}, args);
 }
 
-bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *f, void *ptr), void *args)
+bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
 {
 	return false;
 	// ...

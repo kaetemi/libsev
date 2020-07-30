@@ -67,7 +67,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQu
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 
 SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args);
-SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *f, void *ptr), void *args);
+SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -121,7 +121,7 @@ public:
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 
 		TRes res;
-		auto caller = [=, &res](void *f, void *ptr) -> void {
+		auto caller = [=, &res](void *ptr, void *f) -> void {
 			typedef TRes(*TFn)(void *, TArgs...);
 			res = ((TFn)f)(ptr, args...);
 		};
