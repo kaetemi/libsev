@@ -71,8 +71,14 @@ void operator delete(void *ptr) noexcept
 	s_AllocationCount -= 1;
 }
 
+std::string s_S = "This is really a very long string that definitely won't fit inside the builtin storage"s;
+std::string s_T = "This is really a very long string that also won't fit inside the builtin storage"s;
+std::string s_Y = "!"s;
+
 int main()
 {
+	const int rounds = (1024 * 1024) * 8;
+	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -91,18 +97,18 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if 1
 	{
-		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with 1048576 entries and 2 strings"sv << std::endl;
-		std::string s = "This is really a very long string that definitely won't fit inside the builtin storage";
-		std::string t = "This is really a very long string that also won't fit inside the builtin storage";
+		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
 			if (s[0] == 'T' && t[0] == 'T') return x + y;
 			return -1;
 		};
 		std::queue<std::function<int(int,int)>> q;
 		delta();
-		for (int i = 0; i < (1024 * 1024); ++i)
+		for (int i = 0; i < rounds; ++i)
 			q.push(f);
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
@@ -122,21 +128,23 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+#if 1
 	{
-		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with 1048576 entries and 2 strings"sv << std::endl;
-		std::string s = "This is really a very long string that definitely won't fit inside the builtin storage";
-		std::string t = "This is really a very long string that also won't fit inside the builtin storage";
+		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
 			if (s[0] == 'T' && t[0] == 'T') return x + y;
 			return -1;
 		};
 		concurrency::concurrent_queue<std::function<int(int,int)>> q;
 		delta();
-		for (int i = 0; i < (1024 * 1024); ++i)
+		for (int i = 0; i < rounds; ++i)
 			q.push(f);
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		// Check committed memory consumption!!
 		delta();
 	}
 	{
@@ -152,16 +160,44 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	{
-		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with 1048576 entries and 2 strings"sv << std::endl;
-		std::string s = "This is really a very long string that definitely won't fit inside the builtin storage";
-		std::string t = "This is really a very long string that also won't fit inside the builtin storage";
+		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
 			if (s[0] == 'T' && t[0] == 'T') return x + y;
 			return -1;
 		};
 		sev::ConcurrentFunctorQueue<int(int,int)> q;
 		delta();
-		for (int i = 0; i < (1024 * 1024); ++i)
+		for (int i = 0; i < rounds; ++i)
+			q.push(f);
+		ms = delta();
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		delta();
+	}
+	{
+		ms = delta();
+		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		delta();
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+	}
+#endif
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+#if 1
+	{
+		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries plain"sv << std::endl;
+		auto f = [](int x, int y) -> int {
+			return x + y;
+		};
+		concurrency::concurrent_queue<std::function<int(int,int)>> q;
+		delta();
+		for (int i = 0; i < rounds; ++i)
 			q.push(f);
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
@@ -180,26 +216,53 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
 	{
-		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) 6 threaded with 1048576 entries each and 2 strings"sv << std::endl;
-		std::string s = "This is really a very long string that definitely won't fit inside the builtin storage";
-		std::string t = "This is really a very long string that also won't fit inside the builtin storage";
+		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with "sv << rounds << " entries and plain"sv << std::endl;
+		auto f = [](int x, int y) -> int {
+			return x + y;
+		};
+		sev::ConcurrentFunctorQueue<int(int,int)> q;
+		delta();
+		for (int i = 0; i < rounds; ++i)
+			q.push(f);
+		ms = delta();
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		delta();
+	}
+	{
+		ms = delta();
+		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		delta();
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+	}
+#endif
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+#if 1
+	{
+		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) "sv << tc << " threaded with "sv << rounds << " entries each and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
 			if (s[0] == 'T' && t[0] == 'T') return x + y;
 			return -1;
 		};
 		concurrency::concurrent_queue<std::function<int(int,int)>> q;
 		delta();
-		std::thread threads[6];
-		for (int t = 0; t < 6; ++t)
+		std::thread threads[tc];
+		for (int t = 0; t < tc; ++t)
 		{
 			threads[t] = std::thread([&]() -> void {
-				for (int i = 0; i < (1024 * 1024); ++i)
+				for (int i = 0; i < rounds / tc; ++i)
 					q.push(f);
 			});
 		}
-		for (int t = 0; t < 6; ++t)
+		for (int t = 0; t < tc; ++t)
 		{
 			threads[t].join();
 		}
@@ -223,24 +286,24 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 #if 1
 	{
-		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) 6 threaded with 1048576 entries each and 2 strings"sv << std::endl;
-		std::string s = "This is really a very long string that definitely won't fit inside the builtin storage";
-		std::string t = "This is really a very long string that also won't fit inside the builtin storage";
+		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
 			if (s[0] == 'T' && t[0] == 'T') return x + y;
 			return -1;
 		};
 		sev::ConcurrentFunctorQueue<int(int,int)> q;
 		delta();
-		std::thread threads[6];
-		for (int t = 0; t < 6; ++t)
+		std::thread threads[tc];
+		for (int t = 0; t < tc; ++t)
 		{
 			threads[t] = std::thread([&]() -> void {
-				for (int i = 0; i < (1024 * 1024); ++i)
+				for (int i = 0; i < rounds / tc; ++i)
 					q.push(f);
 				});
 		}
-		for (int t = 0; t < 6; ++t)
+		for (int t = 0; t < tc; ++t)
 		{
 			threads[t].join();
 		}

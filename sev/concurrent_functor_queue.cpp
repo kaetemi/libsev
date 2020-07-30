@@ -265,7 +265,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		while (idx > blockSize)
 		{
 			// Existing preWriteIdx exceeds block size, it means we're allocating in another thread
-			std::this_thread::yield();
+			SEV_Thread_yield();
 			idx = me->PreWriteIdx;
 			block = me->WriteBlock; // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
 		}
