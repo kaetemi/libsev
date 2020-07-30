@@ -5,13 +5,13 @@ FILE(GLOB INLS *.inl)
 
 SOURCE_GROUP("" FILES ${SRCS} ${HDRS} ${INLS})
 
-ADD_EXECUTABLE(test_dyn
+ADD_EXECUTABLE(test_002_dyn
   ${SRCS}
   ${HDRS}
   ${INLS}
 )
 
-TARGET_LINK_LIBRARIES(test_dyn
+TARGET_LINK_LIBRARIES(test_002_dyn
   sev
 )
 
