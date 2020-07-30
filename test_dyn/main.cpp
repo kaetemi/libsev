@@ -287,6 +287,9 @@ int main()
 			ptrdiff_t z = s_AllocationCount;
 			std::cout << "Local allocation count: "sv << z << "\n"sv;
 		}
+		bool success;
+		std::cout << "110 = "sv << q.tryCallAndPop(success, 100) << std::endl;
+		std::cout << "Call: "sv << (success ? "OK"sv : "NOT OK"sv) << std::endl;
 		std::cout << "<--"sv << std::endl;
 	}
 	{

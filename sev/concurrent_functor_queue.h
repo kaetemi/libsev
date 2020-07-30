@@ -62,11 +62,12 @@ SEV_LIB void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *conc
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
 SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 
-SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size); // Does a memcpy of the data ptr
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *ptr, void *args), void *ptr, ptrdiff_t size); // Does a memcpy of the data ptr
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 
-// SEV_LIB void SEV_ConcurrentFunctorQueue_callAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *invoke, void *ptr));
+SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args);
+SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *f, void *ptr), void *args);
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -113,6 +114,20 @@ public:
 		fv.extract(vt, ptr, movable, true);
 		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->MoveConstructor))
 			throw std::bad_alloc();
+	}
+
+	inline TRes tryCallAndPop(bool &success, TArgs... args)
+	{
+		TRes res;
+		auto caller = [&](void *f, void *ptr) -> void {
+			typedef TRes(*TFn)(void *, TArgs...);
+			res = ((TFn)f)(ptr, args...);
+		};
+		static const FunctorVt<void(void *, void *)> vt(caller);
+		typedef FunctorVt<void(void *, void *)>::TInvoke TInvoke;
+		static const TInvoke inv = (TInvoke)vt.raw()->Invoke;
+		success = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(&m, inv, (void *)(&caller));
+		return res;
 	}
 	
 private:

@@ -142,10 +142,10 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 	}
 }
 
-errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size) // Does a memcpy of the data ptr
+errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *ptr, void *args), void *ptr, ptrdiff_t size) // Does a memcpy of the data ptr
 {
 	// A generic function table that calls the function it's passed with the following data as argument pointer
-	typedef void(*TFn)(void *);
+	typedef void(*TFn)(void *ptr, void *args);
 	struct DataView
 	{
 		TFn f;
@@ -158,12 +158,12 @@ errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)
 #if 1
 	// Calculate the right alignment to store the ptr after the padded data, just before the preamble of the next entry.
 	uint8_t d;
-	static const sev::FunctorVt<void()> vtable([d]() -> void {
+	static const sev::FunctorVt<void(void *)> vtable([d](void *args) -> void {
 		// Call function from t
 		void *ptr = (void *)&d;
 		sev::FunctorPreamble *functorPreamble = &((sev::FunctorPreamble *)ptr)[-1];
 		TFn f = (TFn)((uint8_t *)ptr)[functorPreamble->Size - sizeof(TFn)];
-		f(ptr);
+		f(ptr, args);
 	});
 	const ptrdiff_t totalSize = SEV_FUNCTOR_ALIGNED(sizeof(sev::FunctorPreamble) + size + sizeof(TFn)) - sizeof(sev::FunctorPreamble);
 	const DataView data{ f, ptr, size, totalSize };
@@ -329,6 +329,20 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	SEV_ASSERT(nextIdx <= me->BlockSize);
 
 	return 0;
+}
+
+bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args)
+{
+	typedef void(*TFn)(void *ptr, void *args);
+	return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(me, [](void *args, void *f, void *ptr) -> void {
+		((TFn)f)(ptr, args);
+	}, args);
+}
+
+bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *f, void *ptr), void *args)
+{
+	return false;
+	// ...
 }
 
 /* end of file */
