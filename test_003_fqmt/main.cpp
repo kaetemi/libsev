@@ -78,7 +78,7 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) / 8; // *4;
+	const int rounds = (1024 * 1024) * 8; // *4;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -402,6 +402,7 @@ int main()
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
 #ifdef DO_POPS
+#if 1
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
 		long i = 0;
@@ -423,6 +424,7 @@ int main()
 				}
 				InterlockedAdd64(&ref, tref);
 				InterlockedAdd64(&res, tres);
+				_InterlockedDecrement(&i);
 			});
 		}
 		for (int t = 0; t < tc; ++t)
@@ -433,6 +435,26 @@ int main()
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#else
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		int i = 0;
+		intptr_t ref = 0;
+		intptr_t res = 0;
+		bool success;
+		for (;;)
+		{
+			int r = q.tryCallAndPop(success, -1024, i);
+			if (!success) break;
+			ref += (-1024 + (intptr_t)i);
+			res += r;
+			++i;
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 #endif
 		delta();
 	}

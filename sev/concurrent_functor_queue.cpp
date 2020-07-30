@@ -299,6 +299,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		nextIdx = idx + sz;
 
 		// Switch to next write buffer block
+		// printf("--[Push Block]--\n"); // DEBUG
 		block = (uint8_t *)_InterlockedExchangePointer((void *volatile *)(&me->SpareBlock), null); // Get spare and switch to null
 		if (block)
 		{
@@ -396,6 +397,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 				SEV_AtomicSharedMutex_lock(&me->DeleteLock);
 				if (me->ReadBlock == readBlock)
 				{
+					// printf("--[Pop Block]--\n"); // DEBUG
 					readBlock = readBlockPreamble->NextBlock;
 					me->ReadBlock = readBlock;
 				}
@@ -412,6 +414,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 				// Attempt to release or spare the old block
 				if (!readShared) // New value is 0, no other threads left on this
 				{
+					// printf("--[Free Block (1)]--\n"); // DEBUG
 					sev::wipeBlockOnly(oldReadBlock); // , blockSize);
 					// sev::wipeBlock(oldReadBlock, blockSize);
 					uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), oldReadBlock, null);
@@ -464,6 +467,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 	{
 		if (!readShared) // New value is 0, no other threads left on this
 		{
+			// printf("--[Free Block (2)]--\n"); // DEBUG
 			// Attempt to release or spare the old block
 			sev::wipeBlockOnly(readBlock); // , blockSize);
 			// sev::wipeBlock(readBlock, blockSize);
