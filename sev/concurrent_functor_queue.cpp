@@ -39,6 +39,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #define SEV_PREAMBLE_EXTRA /* Reduces space use for C-style functions */
 #endif
 
+#define SEV_DEBUG_NB_OBJECTS /* Testing */
+
 namespace sev {
 namespace /* anonymous */ {
 
@@ -48,6 +50,10 @@ struct BlockPreamble
 
 	ptrdiff_t ReadIdx;
 	long ReadShared;
+
+#ifdef SEV_DEBUG_NB_OBJECTS
+	long NbObjects;
+#endif
 
 	// TODO: Might be interesting to have a Shared count that includes the number of items remaining in the block + count 1 while it's in ReadBlock + count 1 while it's in WriteBlock
 	// Could figure out a way to remove the lock in the pop function
@@ -72,6 +78,9 @@ void wipeBlockOnly(void *block)
 	blockPreamble->NextBlock = null;
 	blockPreamble->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	blockPreamble->ReadShared = 0;
+#ifdef SEV_DEBUG_NB_OBJECTS
+	blockPreamble->NbObjects = 0;
+#endif
 }
 
 void wipeBlock(void *block, ptrdiff_t blockSize)
@@ -331,6 +340,9 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	}
 
 	// Write
+#ifdef SEV_DEBUG_NB_OBJECTS
+	_InterlockedIncrement(&((sev::BlockPreamble *)block)->NbObjects);
+#endif
 	ptrdiff_t ptrIdx = idx + sizeof(sev::FunctorPreamble);
 	sev::FunctorPreamble *functorPreamble = (sev::FunctorPreamble *)&block[idx];
 	functorPreamble->Vt = vt;
@@ -409,14 +421,21 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 				_InterlockedIncrement(&readBlockPreamble->ReadShared);
 				long readShared = _InterlockedDecrement(&oldReadBlock->ReadShared);
 				SEV_AtomicSharedMutex_unlock(&me->DeleteLock);
+#ifdef SEV_DEBUG_NB_OBJECTS
+				// ptrdiff_t oldReadIdx = readIdx; // See oldReadBlock->ReadIdx
+#endif
 				readIdx = readBlockPreamble->ReadIdx;
 
-				// Attempt to release or spare the old block
 				if (!readShared) // New value is 0, no other threads left on this
 				{
 					// printf("--[Free Block (1)]--\n"); // DEBUG
-					sev::wipeBlockOnly(oldReadBlock); // , blockSize);
-					// sev::wipeBlock(oldReadBlock, blockSize);
+#ifdef SEV_DEBUG_NB_OBJECTS
+					SEV_ASSERT(!oldReadBlock->NbObjects);
+#endif
+					SEV_ASSERT(!oldReadBlock->ReadShared);
+					// Attempt to release or spare the old block
+					// sev::wipeBlockOnly(oldReadBlock); // , blockSize);
+					sev::wipeBlock(oldReadBlock, blockSize);
 					uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), oldReadBlock, null);
 					if (spareBlock) // Old value was not 0, not using this as a spare block
 						SEV_alignedFree(oldReadBlock);
@@ -453,10 +472,14 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 	// Destructor
 	functorPreamble->Vt->Destroy(&readBlock[readPtrIdx]);
 
+#ifdef SEV_DEBUG_NB_OBJECTS
+	_InterlockedDecrement(&readBlockPreamble->NbObjects);
+#endif
+
 	// Wipe flags
-	ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
-	for (ptrdiff_t idx = readIdx; readIdx < nextReadIdx; readIdx += SEV_FUNCTOR_ALIGN)
-		((sev::FunctorPreamble *)(&readBlock[readIdx]))->Ready = 0;
+	// ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
+	// for (ptrdiff_t idx = readIdx; readIdx < nextReadIdx; readIdx += SEV_FUNCTOR_ALIGN)
+	// 	((sev::FunctorPreamble *)(&readBlock[readIdx]))->Ready = 0;
 
 	SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
 	long readShared = _InterlockedDecrement(&readBlockPreamble->ReadShared);
@@ -468,9 +491,13 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 		if (!readShared) // New value is 0, no other threads left on this
 		{
 			// printf("--[Free Block (2)]--\n"); // DEBUG
+#ifdef SEV_DEBUG_NB_OBJECTS
+			SEV_ASSERT(!readBlockPreamble->NbObjects);
+#endif
+			SEV_ASSERT(!readBlockPreamble->ReadShared);
 			// Attempt to release or spare the old block
-			sev::wipeBlockOnly(readBlock); // , blockSize);
-			// sev::wipeBlock(readBlock, blockSize);
+			// sev::wipeBlockOnly(readBlock); // , blockSize);
+			sev::wipeBlock(readBlock, blockSize);
 			uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), readBlock, null);
 			if (spareBlock) // Old value was not 0, not using this as a spare block
 				SEV_alignedFree(readBlock);
