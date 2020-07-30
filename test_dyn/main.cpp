@@ -85,6 +85,14 @@ Local allocation count: 2
 Should be empty:
 Added all
 Local allocation count: 131076
+Called: Nice!
+110 = 110
+Call: OK
+Local allocation count: 131075
+Ref: 503300096, Test: 503300096
+Local allocation count: 65539
+Added more
+Local allocation count: 196611
 <--
 Local allocation count: 0
 */
