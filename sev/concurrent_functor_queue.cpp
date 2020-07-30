@@ -36,7 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_FUNCTOR_ALIGNED(value) ((ptrdiff_t)(((value) + SEV_FUNCTOR_ALIGN_MODMASK) & SEV_FUNCTOR_ALIGN_MASK))
 
 #ifdef _WIN64
-#define SEV_PREAMBLE_EXTRA
+// #define SEV_PREAMBLE_EXTRA /* Reduces space use for C-style functions */
 #endif
 
 namespace sev {
@@ -144,6 +144,9 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 
 errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size) // Does a memcpy of the data ptr
 {
+	// TODO: Could be made more clever.
+	// TODO: Calculate the right alignment to store the ptr after the padded data, just before the preamble of the next entry.
+
 	// A generic function table that calls the function it's passed with the following data as argument pointer
 	typedef void(*TFn)(void *);
 	struct DataView

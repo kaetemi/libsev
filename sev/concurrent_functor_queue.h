@@ -65,6 +65,7 @@ SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size); // Does a memcpy of the data ptr
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+
 // SEV_LIB void SEV_ConcurrentFunctorQueue_callAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *invoke, void *ptr));
 
 #ifdef __cplusplus
