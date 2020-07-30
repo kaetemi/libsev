@@ -62,6 +62,8 @@ SEV_LIB void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *conc
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize);
 SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size); // Does a memcpy of the data ptr
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 // SEV_LIB void SEV_ConcurrentFunctorQueue_callAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *invoke, void *ptr));
 
@@ -88,7 +90,7 @@ public:
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		fv.extract(vt, ptr);
-		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->ConstCopyConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->ConstCopyConstructor))
 			throw std::bad_alloc();
 	}
 
@@ -98,7 +100,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
-		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->CopyConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->CopyConstructor))
 			throw std::bad_alloc();
 	}
 	
@@ -108,7 +110,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		if (SEV_ConcurrentFunctorQueue_pushFunctor(&m, vt->raw(), ptr, vt->raw()->MoveConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->MoveConstructor))
 			throw std::bad_alloc();
 	}
 	

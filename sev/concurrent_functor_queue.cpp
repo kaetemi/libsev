@@ -35,6 +35,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_FUNCTOR_ALIGN_MASK (~(ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
 #define SEV_FUNCTOR_ALIGNED(value) ((ptrdiff_t)(((value) + SEV_FUNCTOR_ALIGN_MODMASK) & SEV_FUNCTOR_ALIGN_MASK))
 
+#ifdef _WIN64
+#define SEV_PREAMBLE_EXTRA
+#endif
+
 namespace sev {
 namespace /* anonymous */ {
 
@@ -45,19 +49,13 @@ struct BlockPreamble
 
 struct FunctorPreamble
 {
+#ifdef SEV_PREAMBLE_EXTRA
+	void *Extra;
+#endif
 	volatile ptrdiff_t Ready;
 	const SEV_FunctorVt *Vt;
 	ptrdiff_t Size;
 };
-
-/*
-void recursiveRelease(BlockPreamble *blockPreamble)
-{
-	if (blockPreamble->NextBlock)
-		recursiveRelease((BlockPreamble *)blockPreamble->NextBlock);
-	_aligned_free(blockPreamble);
-}
-*/
 
 } /* anonymous namespace */
 } /* namespace sev */
@@ -144,14 +142,64 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 	}
 }
 
+errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size) // Does a memcpy of the data ptr
+{
+	// A generic function table that calls the function it's passed with the following data as argument pointer
+	typedef void(*TFn)(void *);
+	struct DataView
+	{
+		TFn f;
+		void *ptr;
+		ptrdiff_t size;
+	};
+#ifdef SEV_PREAMBLE_EXTRA
+	uint8_t d;
+	static const sev::FunctorVt<void()> vtable([d]() -> void {
+		// Call function from the preamble
+		sev::FunctorPreamble *functorPreamble = &((sev::FunctorPreamble *)&d)[-1];
+		TFn f = (TFn)functorPreamble->Extra;
+		f((void *)&d);
+	});
+	const DataView data{ f, ptr, size };
+	void(*forwardConstructor)(void *, void *) = [](void *ptr, void *other) -> void {
+		// Construct the data in the queue serially, with the function in the preamble
+		auto data = (DataView *)other;
+		sev::FunctorPreamble *functorPreamble = &((sev::FunctorPreamble *)ptr)[-1];
+		functorPreamble->Extra = data->f;
+		memcpy(ptr, data->ptr, data->size);
+	};
+	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.raw(), size, (void *)&data, forwardConstructor);
+#else
+	static const ptrdiff_t preamble = SEV_FUNCTOR_ALIGN; // sizeof(f); // Just jump a whole alignment block to enforce alignment...
+	static const sev::FunctorVt<void()> vtable([f]() -> void {
+		// Call function from the data
+		void *ptr = &((uint8_t *)f)[preamble];
+		f(ptr);
+	});
+	const DataView data{ f, ptr, size };
+	void(*forwardConstructor)(void *, void *) = [](void *ptr, void *other) -> void {
+		// Construct the data in the queue serially
+		auto data = (DataView *)other;
+		*(TFn *)ptr = data->f;
+		memcpy(&((uint8_t *)ptr)[preamble], data->ptr, data->size);
+	};
+	const ptrdiff_t totalSize = preamble + size;
+	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.raw(), totalSize, (void *)&data, forwardConstructor);
+#endif
+}
+
 errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
-	// This function only locks while flipping to the next buffer
-	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
-	// FIXME: Blocks need to be cleared... (at least the Ready flag on all alignment boundaries...)
+	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vt, vt->Size, ptr, forwardConstructor);
+}
 
+errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+{
+	// This function only locks while flipping to the next buffer
+
+	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
-	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(vt->Size + sizeof(sev::FunctorPreamble)); // Pad
+	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(size + sizeof(sev::FunctorPreamble)); // Pad
 	const ptrdiff_t blockSize = me->BlockSize;
 	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockSize)
 		return ENOMEM;
