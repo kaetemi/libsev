@@ -119,7 +119,7 @@ public:
 	inline TRes tryCallAndPop(bool &success, TArgs... args)
 	{
 		TRes res;
-		auto caller = [&](void *f, void *ptr) -> void {
+		auto caller = [=, &res](void *f, void *ptr) -> void {
 			typedef TRes(*TFn)(void *, TArgs...);
 			res = ((TFn)f)(ptr, args...);
 		};
