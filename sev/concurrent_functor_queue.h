@@ -118,6 +118,8 @@ public:
 
 	inline TRes tryCallAndPop(bool &success, TArgs... args)
 	{
+		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
+
 		TRes res;
 		auto caller = [=, &res](void *f, void *ptr) -> void {
 			typedef TRes(*TFn)(void *, TArgs...);
