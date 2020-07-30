@@ -144,9 +144,6 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 
 errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *), void *ptr, ptrdiff_t size) // Does a memcpy of the data ptr
 {
-	// TODO: Could be made more clever.
-	// TODO: Calculate the right alignment to store the ptr after the padded data, just before the preamble of the next entry.
-
 	// A generic function table that calls the function it's passed with the following data as argument pointer
 	typedef void(*TFn)(void *);
 	struct DataView
@@ -154,7 +151,30 @@ errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)
 		TFn f;
 		void *ptr;
 		ptrdiff_t size;
+#if 1
+		ptrdiff_t finalSize;
+#endif
 	};
+#if 1
+	// Calculate the right alignment to store the ptr after the padded data, just before the preamble of the next entry.
+	uint8_t d;
+	static const sev::FunctorVt<void()> vtable([d]() -> void {
+		// Call function from t
+		void *ptr = (void *)&d;
+		sev::FunctorPreamble *functorPreamble = &((sev::FunctorPreamble *)ptr)[-1];
+		TFn f = (TFn)((uint8_t *)ptr)[functorPreamble->Size - sizeof(TFn)];
+		f(ptr);
+	});
+	const ptrdiff_t totalSize = SEV_FUNCTOR_ALIGNED(sizeof(sev::FunctorPreamble) + size + sizeof(TFn)) - sizeof(sev::FunctorPreamble);
+	const DataView data{ f, ptr, size, totalSize };
+	void(*forwardConstructor)(void *, void *) = [](void *ptr, void *other) -> void {
+		// Construct the data in the queue serially, place the function after the padded data
+		auto data = (DataView *)other;
+		memcpy(ptr, data->ptr, data->size);
+		*(TFn *)(&((uint8_t *)ptr)[data->finalSize - sizeof(TFn)]) = data->f;
+	};
+	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.raw(), totalSize, (void *)&data, forwardConstructor);
+#else
 #ifdef SEV_PREAMBLE_EXTRA
 	uint8_t d;
 	static const sev::FunctorVt<void()> vtable([d]() -> void {
@@ -188,6 +208,7 @@ errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)
 	};
 	const ptrdiff_t totalSize = preamble + size;
 	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.raw(), totalSize, (void *)&data, forwardConstructor);
+#endif
 #endif
 }
 
