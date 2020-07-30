@@ -308,6 +308,19 @@ int main()
 			ptrdiff_t z = s_AllocationCount;
 			std::cout << "Local allocation count: "sv << z << "\n"sv;
 		}
+		for (int i = 0; i < (64 * 1024); ++i)
+		{
+			q.push([ls, i](int y) -> int {
+				if (ls[0] == 'T')
+					return y + i;
+				return -1;
+				});
+		}
+		std::cout << "Added more"sv << std::endl;
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		std::cout << "<--"sv << std::endl;
 	}
 	{
