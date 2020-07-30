@@ -48,6 +48,9 @@ struct BlockPreamble
 
 	ptrdiff_t ReadIdx;
 	long ReadShared;
+
+	// TODO: Might be interesting to have a Shared count that includes the number of items remaining in the block + count 1 while it's in ReadBlock + count 1 while it's in WriteBlock
+	// Could figure out a way to remove the lock in the pop function
 };
 
 struct FunctorPreamble
