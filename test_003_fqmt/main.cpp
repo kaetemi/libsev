@@ -78,7 +78,7 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) * 8;
+	const int rounds = (1024 * 1024) / 8; // *4;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -98,7 +98,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if 0
 	{
 		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -148,7 +148,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if 0
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -194,9 +194,11 @@ int main()
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
 	}
+#endif
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+#if 1
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -247,7 +249,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if 0
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries plain"sv << std::endl;
 		auto f = [](int x, int y) -> int {
@@ -327,6 +329,37 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		long i = 0;
+		int64_t ref = 0;
+		int64_t res = 0;
+		for (int t = 0; t < tc; ++t)
+		{
+			threads[t] = std::thread([&]() -> void {
+				int64_t tref = 0;
+				int64_t tres = 0;
+				std::function<int(int, int)> fp;
+				while (q.try_pop(fp))
+				{
+					long j = _InterlockedIncrement(&i) - 1;
+					tref += (-1024 + (intptr_t)j);
+					tres += fp(-1024, j);
+				}
+				InterlockedAdd64(&ref, tref);
+				InterlockedAdd64(&res, tres);
+			});
+		}
+		for (int t = 0; t < tc; ++t)
+		{
+			threads[t].join();
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 		delta();
 	}
 	{
@@ -359,7 +392,7 @@ int main()
 			threads[t] = std::thread([&]() -> void {
 				for (int i = 0; i < rounds / tc; ++i)
 					q.push(f);
-				});
+			});
 		}
 		for (int t = 0; t < tc; ++t)
 		{
@@ -368,6 +401,39 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		long i = 0;
+		int64_t ref = 0;
+		int64_t res = 0;
+		for (int t = 0; t < tc; ++t)
+		{
+			threads[t] = std::thread([&]() -> void {
+				int64_t tref = 0;
+				int64_t tres = 0;
+				bool success;
+				for (;;)
+				{
+					long j = _InterlockedIncrement(&i) - 1;
+					int r = q.tryCallAndPop(success, -1024, j);
+					if (!success) break;
+					tref += (-1024 + (intptr_t)j);
+					tres += r;
+				}
+				InterlockedAdd64(&ref, tref);
+				InterlockedAdd64(&res, tres);
+			});
+		}
+		for (int t = 0; t < tc; ++t)
+		{
+			threads[t].join();
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 		delta();
 	}
 	{

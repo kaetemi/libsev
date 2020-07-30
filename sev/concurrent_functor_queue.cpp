@@ -320,10 +320,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 				if (res) return res;
 				return ENOMEM;
 			}
-			((sev::BlockPreamble *)block)->NextBlock = null;
-			((sev::BlockPreamble *)block)->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
-			for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
-				((sev::FunctorPreamble *)&block[i])->Ready = 0;
+			sev::wipeBlock(block, blockSize);
 		}
 
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
@@ -401,6 +398,10 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue 
 				{
 					readBlock = readBlockPreamble->NextBlock;
 					me->ReadBlock = readBlock;
+				}
+				else
+				{
+					readBlock = me->ReadBlock;
 				}
 				readBlockPreamble = (sev::BlockPreamble *)readBlock;
 				_InterlockedIncrement(&readBlockPreamble->ReadShared);
