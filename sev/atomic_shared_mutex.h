@@ -36,6 +36,93 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #define SEV_SUPPRESS_ATOMIC_MUTEX
 
 #ifdef __cplusplus
+extern "C" {
+#endif
+
+static inline void SEV_Thread_yield()
+{
+#ifdef _WIN32
+	SwitchToThread();
+#else
+	std::this_thread::yield(); // TODO
+#endif
+}
+
+struct SEV_AtomicSharedMutex
+{
+	volatile long Unique; // 0 or 1
+	volatile long Sharing; // 0 to infinity-ish
+
+};
+
+static inline void SEV_AtomicSharedMutex_init(SEV_AtomicSharedMutex *me)
+{
+	(*me) = { 0, 0 };
+}
+
+static inline bool SEV_AtomicSharedMutex_tryLock(SEV_AtomicSharedMutex *me)
+{
+	if (_InterlockedExchange(&me->Unique, 1))
+		return false; // Already locked for unique
+	if (me->Sharing) // Successfully locked for unique, but busy sharing
+	{
+		me->Unique = 0; // Unlock unique
+		return false; // Already busy for sharing
+	}
+	return true; // Successfully locked for unique and sharing
+}
+
+static inline void SEV_AtomicSharedMutex_lock(SEV_AtomicSharedMutex *me)
+{
+	while (_InterlockedExchange(&me->Unique, 1))
+		SEV_Thread_yield();
+	while (me->Sharing)
+		SEV_Thread_yield();
+}
+
+static inline void SEV_AtomicSharedMutex_unlock(SEV_AtomicSharedMutex *me)
+{
+#ifdef SEV_DEBUG
+	if (!_InterlockedExchange(&me->Unique, 0))
+		SEV_DEBUG_BREAK();
+#else
+	me->Unique = 0;
+#endif
+}
+
+static inline bool SEV_AtomicSharedMutex_tryLockShared(SEV_AtomicSharedMutex *me)
+{
+	_InterlockedIncrement(&me->Sharing);
+	if (me->Unique)
+	{
+		_InterlockedDecrement(&me->Sharing);
+		return false;
+	}
+	return true;
+}
+
+static inline void SEV_AtomicSharedMutex_lockShared(SEV_AtomicSharedMutex *me)
+{
+	_InterlockedIncrement(&me->Sharing);
+	while (me->Unique)
+	{
+		_InterlockedDecrement(&me->Sharing);
+		while (me->Unique)
+			SEV_Thread_yield();
+		_InterlockedIncrement(&me->Sharing);
+	}
+}
+
+static inline void SEV_AtomicSharedMutex_unlockShared(SEV_AtomicSharedMutex *me)
+{
+	_InterlockedDecrement(&me->Sharing);
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
 
 #ifndef SEV_SUPPRESS_ATOMIC_MUTEX
 
@@ -46,6 +133,83 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
+#if 1
+//! Lock allowing one unique writer and multiple shared readers
+class AtomicSharedMutex
+{
+public:
+	inline AtomicSharedMutex() noexcept : m{ 0, 0 }
+	{
+
+	}
+
+#ifdef SEV_DEBUG
+	inline ~AtomicSharedMutex() noexcept
+	{
+		if (!try_lock())
+			debug_break(); // Must be unlocked before destroying
+	}
+#endif
+
+	inline bool try_lock() noexcept
+	{
+		return SEV_AtomicSharedMutex_tryLock(&m);
+	}
+
+	inline bool tryLock() noexcept
+	{
+		return try_lock();
+	}
+
+	inline void lock() noexcept
+	{
+		SEV_AtomicSharedMutex_lock(&m);
+	}
+
+	inline void unlock() noexcept
+	{
+		SEV_AtomicSharedMutex_unlock(&m);
+	}
+
+	inline bool try_lock_shared() noexcept
+	{
+		return SEV_AtomicSharedMutex_tryLockShared(&m);
+	}
+	
+	inline bool tryLockShared() noexcept
+	{
+		return try_lock_shared();
+	}
+
+	inline void lock_shared() noexcept
+	{
+		SEV_AtomicSharedMutex_lockShared(&m);
+	}
+	
+	inline void lockShared() noexcept
+	{
+		lock_shared();
+	}
+	
+	inline void unlock_shared() noexcept
+	{
+		SEV_AtomicSharedMutex_unlockShared(&m);
+	}
+	
+	inline void unlockShared() noexcept
+	{
+		unlock_shared();
+	}
+
+private:
+	SEV_AtomicSharedMutex m;
+
+private:
+	AtomicSharedMutex &operator=(const AtomicSharedMutex&) = delete;
+	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
+
+}; /* class AtomicSharedMutex */
+#else
 //! Lock allowing one unique writer and multiple shared readers
 class AtomicSharedMutex
 {
@@ -108,7 +272,7 @@ public:
 		}
 		return true;
 	}
-	
+
 	inline bool tryLockShared() noexcept
 	{
 		return try_lock_shared();
@@ -125,17 +289,17 @@ public:
 			++m_Sharing;
 		}
 	}
-	
+
 	inline void lockShared() noexcept
 	{
 		lock_shared();
 	}
-	
+
 	inline void unlock_shared() noexcept
 	{
 		--m_Sharing;
 	}
-	
+
 	inline void unlockShared() noexcept
 	{
 		unlock_shared();
@@ -150,6 +314,7 @@ private:
 	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
 
 }; /* class AtomicSharedMutex */
+#endif
 
 } /* namespace sev */
 

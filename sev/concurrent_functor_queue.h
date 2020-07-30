@@ -39,6 +39,7 @@ Concurrent queue for arbitrary-sized functors with a fixed-size block allocator.
 
 #include "platform.h"
 #include "functor_view.h"
+#include "atomic_shared_mutex.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,8 +52,9 @@ struct SEV_ConcurrentFunctorQueue
 	uint8_t *volatile WriteBlock;
 	uint8_t *volatile SpareBlock;
 
-	volatile ptrdiff_t ReadIdx;
 	volatile ptrdiff_t PreWriteIdx;
+
+	SEV_AtomicSharedMutex DeleteLock;
 
 };
 

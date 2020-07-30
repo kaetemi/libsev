@@ -288,8 +288,26 @@ int main()
 			std::cout << "Local allocation count: "sv << z << "\n"sv;
 		}
 		bool success;
-		std::cout << "110 = "sv << q.tryCallAndPop(success, 100) << std::endl;
+		std::cout << q.tryCallAndPop(success, 100) << " = 110" << std::endl;
 		std::cout << "Call: "sv << (success ? "OK"sv : "NOT OK"sv) << std::endl;
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
+		int ref = 0;
+		int test = 0;
+		for (int i = 0; i < (32 * 1024); ++i) // Pop half
+		{
+			bool success;
+			ref += (-1024 + i);
+			test += q.tryCallAndPop(success, -1024);
+			if (!success) std::cout << "NOT OK";
+		}
+		std::cout << "Ref: "sv << ref << ", Test: "sv << test << std::endl;
+		{
+			ptrdiff_t z = s_AllocationCount;
+			std::cout << "Local allocation count: "sv << z << "\n"sv;
+		}
 		std::cout << "<--"sv << std::endl;
 	}
 	{
