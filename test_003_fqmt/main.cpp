@@ -77,6 +77,7 @@ std::string s_Y = "!"s;
 
 int main()
 {
+#define DO_POPS
 	const int rounds = (1024 * 1024) * 8;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
@@ -112,7 +113,26 @@ int main()
 			q.push(f);
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
-		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		int i = 0;
+		intptr_t ref = 0;
+		intptr_t res = 0;
+		while (!q.empty())
+		{
+			std::function<int(int, int)> &fp = q.front();
+			ref += (-1024 + (intptr_t)i);
+			res += fp(-1024, i);
+			q.pop();
+			++i;
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 		delta();
 	}
 	{
@@ -145,6 +165,24 @@ int main()
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
 		// Check committed memory consumption!!
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		int i = 0;
+		intptr_t ref = 0;
+		intptr_t res = 0;
+		std::function<int(int, int)> fp;
+		while (q.try_pop(fp))
+		{
+			ref += (-1024 + (intptr_t)i);
+			res += fp(-1024, i);
+			++i;
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 		delta();
 	}
 	{
@@ -174,6 +212,26 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		int i = 0;
+		intptr_t ref = 0;
+		intptr_t res = 0;
+		bool success;
+		for (;;)
+		{
+			int r = q.tryCallAndPop(success, -1024, i);
+			if (!success) break;
+			ref += (-1024 + (intptr_t)i);
+			res += r;
+			++i;
+		}
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
 		delta();
 	}
 	{

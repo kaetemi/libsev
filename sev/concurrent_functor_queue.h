@@ -114,7 +114,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->MoveConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, movable ? vt->raw()->MoveConstructor : vt->raw()->CopyConstructor))
 			throw std::bad_alloc();
 	}
 
