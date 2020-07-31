@@ -47,14 +47,14 @@ namespace /* anonymous */ {
 
 struct BlockPreamble
 {
-	uint8_t *NextBlock;
+	uint8_t *volatile NextBlock;
 
-	ptrdiff_t ReadIdx;
-	long ReadShared;
-	// long PreWriteShared;
+	volatile ptrdiff_t ReadIdx;
+	volatile long ReadShared;
+	// volatile long PreWriteShared;
 
 #ifdef SEV_DEBUG_NB_OBJECTS
-	long NbObjects;
+	volatile long NbObjects;
 #endif
 
 	// TODO: Might be interesting to have a Shared count that includes the number of items remaining in the block + count 1 while it's in ReadBlock + count 1 while it's in WriteBlock
