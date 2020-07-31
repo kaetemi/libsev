@@ -76,7 +76,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQu
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args); // Returns ENODATA if nothing to pop, EOTHER if function threw an exception, 0 if OK
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
 #ifdef __cplusplus
-SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args); // Throws when function throws and exception
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args); // Throws when function throws and exception
 #endif
 
 #ifdef __cplusplus
@@ -129,16 +129,37 @@ public:
 	inline TRes tryCallAndPop(bool &success, TArgs... args)
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
-
+		std::exception_ptr err;
 		TRes res;
-		auto caller = [=, &res](void *ptr, void *f) -> void {
-			typedef TRes(*TFn)(void *, TArgs...);
-			res = ((TFn)f)(ptr, args...);
+		auto caller = [=, &err, &res](void *ptr, void *f) -> void {
+			try
+			{
+				typedef TRes(*TFn)(void *, TArgs...);
+				res = ((TFn)f)(ptr, args...);
+			}
+			catch (...)
+			{
+				err = std::current_exception();
+			}
 		};
 		static const FunctorVt<void(void *, void *)> vt(caller);
 		typedef FunctorVt<void(void *, void *)>::TInvoke TInvoke;
 		static const TInvoke inv = (TInvoke)vt.raw()->Invoke;
-		success = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, inv, (void *)(&caller));
+		errno_t en = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, inv, (void *)(&caller));
+		success = (en == 0);
+		if (err)
+		{
+			// https://stackoverflow.com/questions/9252139/passing-exceptions-across-a-c-api-boundary
+			std::rethrow_exception(err);
+		}
+		if (en == ENOMEM)
+		{
+			throw std::bad_alloc();
+		}
+		if (en)
+		{
+			throw std::exception();
+		}
 		return res;
 	}
 	
