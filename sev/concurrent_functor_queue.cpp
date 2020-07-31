@@ -728,18 +728,23 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 		}
 	});
 
+	bool debugTriedAgain = false;
+
 	for (; ; )
 	{
 		const auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readIdx]);
-		const bool ready = readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready);
-		if (!ready) // No more read space, or flag not set
+		const bool functorReady = readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready);
+		if (!functorReady) // No more read space, or flag not set
 		{
 			// Nothing new in this block
 			if (SEV_AtomicPtr_load(&readBlockPreamble->NextBlock)) // Next block available
 			{
-				SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
+				// SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
 				if (readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready))
+				{
+					debugTriedAgain = true;
 					continue; // Try again
+				}
 
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
@@ -822,6 +827,8 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	});
 
 	// Call
+	SEV_ASSERT(SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
+	SEV_ASSERT(SEV_AtomicPtrDiff_load(&functorPreamble->Ready));
 	caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->Invoke);
 	return true;
 }
