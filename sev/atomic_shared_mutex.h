@@ -257,6 +257,38 @@ static inline bool SEV_AtomicSharedMutex_tryLock(SEV_AtomicSharedMutex *me)
 	return true; // Successfully locked for unique and sharing
 }
 
+static inline bool SEV_AtomicSharedMutex_tryPartialLock(SEV_AtomicSharedMutex *me) // If no other thread has a unique lock, a partial unique lock is obtained, and new threads are blocked from obtaining a shared lock. Other threads may still hold an existing shared lock
+{
+	if (SEV_AtomicInt32_exchange(&me->Unique, 1))
+		return false; // Already locked for unique
+	return true; // Successfully locked for unique
+}
+
+static inline void SEV_AtomicSharedMutex_cancelPartialLock(SEV_AtomicSharedMutex *me)
+{
+	if (!SEV_AtomicInt32_exchange(&me->Unique, 0))
+		SEV_DEBUG_BREAK();
+}
+
+static inline void SEV_AtomicSharedMutex_completePartialLock(SEV_AtomicSharedMutex *me) // Blocks until all shared locks are unlocked, a full unique lock is now obtained
+{
+	SEV_ASSERT(SEV_AtomicInt32_load(&me->Unique));
+	while (SEV_AtomicInt32_load(&me->Sharing))
+		SEV_Thread_yield();
+}
+
+static inline void SEV_AtomicSharedMutex_downgradePartialLock(SEV_AtomicSharedMutex *me) // Turns a complete lock into a shared lock
+{
+	SEV_AtomicInt32_increment(&me->Sharing);
+	if (!SEV_AtomicInt32_exchange(&me->Unique, 0))
+		SEV_DEBUG_BREAK();
+}
+
+static inline bool SEV_AtomicSharedMutex_isLocked(SEV_AtomicSharedMutex *me) // Returns true if a unique or partial unique lock exists
+{
+	return SEV_AtomicInt32_load(&me->Unique);
+}
+
 static inline void SEV_AtomicSharedMutex_lock(SEV_AtomicSharedMutex *me)
 {
 	while (SEV_AtomicInt32_exchange(&me->Unique, 1))
@@ -268,7 +300,7 @@ static inline void SEV_AtomicSharedMutex_lock(SEV_AtomicSharedMutex *me)
 static inline void SEV_AtomicSharedMutex_unlock(SEV_AtomicSharedMutex *me)
 {
 #ifdef SEV_DEBUG
-	if (!_InterlockedExchange(&me->Unique, 0))
+	if (!SEV_AtomicInt32_exchange(&me->Unique, 0))
 		SEV_DEBUG_BREAK();
 #else
 	me->Unique = 0;

@@ -80,7 +80,7 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) * 8 * 1;
+	const int rounds = (1024 * 1024);// *8 * 1;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -281,9 +281,11 @@ int main()
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
 	}
+#endif
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+#if DEF_ALL ////////////
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with "sv << rounds << " entries and plain"sv << std::endl;
 		auto f = [](int x, int y) -> int {
@@ -386,7 +388,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if 1 ///////////
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -413,7 +415,7 @@ int main()
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
 #ifdef DO_POPS
-#if 1
+#if 0
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
 		long i = 0;
@@ -448,7 +450,7 @@ int main()
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
 #else
-		std::cout << "Test pop()"sv << std::endl;
+		std::cout << "Test pop() single threaded"sv << std::endl;
 		delta();
 		int i = 0;
 		intptr_t ref = 0;
@@ -747,8 +749,10 @@ int main()
 				{
 					q.push(f);
 					more.set();
+					// if (i % 4096 == 0) std::cout << "out: " << i << ": " << i << std::endl;
 				}
-				});
+				// std::cout << "ok" << std::endl;
+			});
 		}
 		std::thread readThreads[(tc / 2)];
 		long i = 0;
@@ -776,6 +780,7 @@ int main()
 							continue;
 						}
 					}
+					// if (j % 4096 == 0) std::cout << "in: " << j << std::endl;
 					tref += (-1024 + (intptr_t)j);
 					tres += r;
 					j = _InterlockedIncrement(&i) - 1;
@@ -791,6 +796,7 @@ int main()
 		{
 			writeThreads[t].join();
 		}
+		// std::cout << "Write complete\n"sv;
 		written = true;
 		more.set();
 		for (int t = 0; t < (tc / 2); ++t)

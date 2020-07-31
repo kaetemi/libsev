@@ -51,16 +51,18 @@ struct SEV_ConcurrentFunctorQueue
 {
 	ptrdiff_t BlockSize;
 	SEV_AtomicPtr ReadBlock;
-	SEV_AtomicPtr WriteBlock;
+	void *WriteBlock;
 	SEV_AtomicPtr SpareBlock;
 
 	SEV_AtomicPtrDiff PreWriteIdx;
 
+	SEV_AtomicSharedMutex AtomicWriteSwap;
+
 	SEV_AtomicSharedMutex DeleteLock;
-	SEV_AtomicInt32 PreLockShared;
+	// SEV_AtomicInt32 PreLockShared;
 
 #ifdef SEV_DEBUG_CFQ_PUSH
-	SEV_AtomicInt32 VerifyAllocLock;
+	// SEV_AtomicInt32 VerifyAllocLock;
 #endif
 
 };
