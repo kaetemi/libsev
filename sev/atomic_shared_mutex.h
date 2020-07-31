@@ -33,6 +33,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "platform.h"
 
+#ifdef __cplusplus
+#include <atomic>
+#include <thread>
+#endif
+
 // #define SEV_SUPPRESS_ATOMIC_MUTEX
 
 #ifdef __cplusplus
@@ -47,9 +52,21 @@ static_assert(sizeof(int32_t) == sizeof(SEV_AtomicInt32));
 static_assert(sizeof(ptrdiff_t) == sizeof(SEV_AtomicPtrDiff));
 static_assert(sizeof(void *) == sizeof(SEV_AtomicPtr));
 
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+static_assert(sizeof(std::atomic_int32_t) == sizeof(SEV_AtomicInt32));
+static_assert(sizeof(std::atomic_ptrdiff_t) == sizeof(SEV_AtomicPtrDiff));
+static_assert(sizeof(std::atomic_ptrdiff_t) == sizeof(SEV_AtomicPtr));
+#endif
+
 static inline int32_t SEV_AtomicInt32_load(SEV_AtomicInt32 *src)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	return ((std::atomic_int32_t *)src)->load();
+#elif defined(_WIN32)
 	return InterlockedCompareExchange(src, 0, 0);
 #else
 	static_assert(false);
@@ -58,7 +75,9 @@ static inline int32_t SEV_AtomicInt32_load(SEV_AtomicInt32 *src)
 
 static inline void SEV_AtomicInt32_store(SEV_AtomicInt32 *dst, int32_t val)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	((std::atomic_int32_t *)dst)->store(val);
+#elif defined(_WIN32)
 	InterlockedExchange(dst, val);
 #else
 	static_assert(false);
@@ -103,7 +122,9 @@ static inline int32_t SEV_AtomicInt32_decrement(SEV_AtomicInt32 *var)
 
 static inline ptrdiff_t SEV_AtomicPtrDiff_load(SEV_AtomicPtrDiff *src)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	return ((std::atomic_ptrdiff_t *)src)->load();
+#elif defined(_WIN32)
 	return (ptrdiff_t)InterlockedCompareExchangePointer((volatile PVOID *)src, null,null);
 #else
 	static_assert(false);
@@ -112,7 +133,9 @@ static inline ptrdiff_t SEV_AtomicPtrDiff_load(SEV_AtomicPtrDiff *src)
 
 static inline void SEV_AtomicPtrDiff_store(SEV_AtomicPtrDiff *dst, ptrdiff_t val)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	((std::atomic_ptrdiff_t *)dst)->store(val);
+#elif defined(_WIN32)
 	InterlockedExchangePointer((volatile PVOID *)dst, (PVOID)val);
 #else
 	static_assert(false);
@@ -157,7 +180,9 @@ static inline ptrdiff_t SEV_AtomicPtrDiff_decrement(SEV_AtomicPtrDiff *var)
 
 static inline void *SEV_AtomicPtr_load(SEV_AtomicPtr *src)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	return (void *)((std::atomic_ptrdiff_t *)src)->load();
+#elif defined(_WIN32)
 	return (void *)InterlockedCompareExchangePointer(src, null,null);
 #else
 	static_assert(false);
@@ -166,7 +191,9 @@ static inline void *SEV_AtomicPtr_load(SEV_AtomicPtr *src)
 
 static inline void SEV_AtomicPtr_store(SEV_AtomicPtr *dst, void *val)
 {
-#ifdef _WIN32
+#if defined(__cplusplus)
+	((std::atomic_ptrdiff_t *)dst)->store((ptrdiff_t)val);
+#elif defined(_WIN32)
 	InterlockedExchangePointer(dst, val);
 #else
 	static_assert(false);
@@ -193,14 +220,18 @@ static inline void *SEV_AtomicPtr_compareExchange(SEV_AtomicPtr *dst, void *exch
 
 static inline void SEV_Thread_yield()
 {
-#ifdef _WIN32
-	SwitchToThread();
-#elif __cplusplus
+#if defined(__cplusplus)
 	std::this_thread::yield();
+#elif defined(_WIN32)
+	SwitchToThread();
 #else
 	static_assert(false);
 #endif
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct SEV_AtomicSharedMutex
 {

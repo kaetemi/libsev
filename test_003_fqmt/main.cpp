@@ -386,7 +386,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if DEF_ALL
+#if 0
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -654,7 +654,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if 0
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
@@ -752,6 +752,7 @@ int main()
 		}
 		std::thread readThreads[(tc / 2)];
 		long i = 0;
+		long i2 = 0;
 		int64_t ref = 0;
 		int64_t res = 0;
 		for (int t = 0; t < (tc / 2); ++t)
@@ -778,6 +779,7 @@ int main()
 					tref += (-1024 + (intptr_t)j);
 					tres += r;
 					j = _InterlockedIncrement(&i) - 1;
+					_InterlockedIncrement(&i2);
 				}
 				InterlockedAdd64(&ref, tref);
 				InterlockedAdd64(&res, tres);
@@ -796,7 +798,7 @@ int main()
 			readThreads[t].join();
 		}
 		ms = delta();
-		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << " / "sv << i2 << " / "sv << rounds << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
 		delta();
