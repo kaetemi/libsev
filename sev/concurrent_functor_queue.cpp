@@ -273,21 +273,34 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	bool locked = false;
 	ptrdiff_t lockIdx;
 	sev::BlockPreamble *prevBlockPreamble;
+	bool preLocked = false;
 	for (; ;)
 	{
-		while (idx > blockSize)
+		if (idx > blockSize)
 		{
-			// Existing preWriteIdx exceeds block size, it means we're allocating in another thread
-			SEV_Thread_yield();
-			idx = me->PreWriteIdx;
-			block = me->WriteBlock; // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
+			if (preLocked)
+			{
+				_InterlockedDecrement(&me->PreLockShared);
+				preLocked = false;
+			}
+			do
+			{
+				// Existing preWriteIdx exceeds block size, it means we're allocating in another thread
+				SEV_Thread_yield();
+				idx = me->PreWriteIdx;
+				block = me->WriteBlock; // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
+			} while (idx > blockSize);
 		}
 		nextIdx = idx + sz;
-		_InterlockedIncrement(&me->PreLockShared);
+		if (!preLocked)
+		{
+			_InterlockedIncrement(&me->PreLockShared);
+			preLocked = true;
+		}
 		if (_InterlockedCompareExchangePointer((void *volatile *)(&me->PreWriteIdx), (void *)nextIdx, (void *)idx) != (void *)idx)
 		{
-			_InterlockedDecrement(&me->PreLockShared);
-			SEV_Thread_yield();
+			// _InterlockedDecrement(&me->PreLockShared);
+			// SEV_Thread_yield();
 			idx = me->PreWriteIdx;
 			block = me->WriteBlock;
 			continue; // Try again, preWriteIdx was channged by another thread
@@ -346,6 +359,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	}
 
 	// Write
+	SEV_ASSERT(preLocked);
 #ifdef SEV_DEBUG_NB_OBJECTS
 	_InterlockedIncrement(&((sev::BlockPreamble *)block)->NbObjects);
 #endif
