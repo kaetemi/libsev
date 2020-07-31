@@ -603,18 +603,23 @@ int main()
 				int64_t tref = 0;
 				int64_t tres = 0;
 				bool success;
+				long j = _InterlockedIncrement(&i) - 1;
 				for (;;)
 				{
-					long j = _InterlockedIncrement(&i) - 1;
 					if (j >= rounds) break;
 					int r = q.tryCallAndPop(success, -1024, j);
 					if (!success)
 					{
 						if (written) break;
-						else more.wait();
+						else
+						{
+							more.wait();
+							continue;
+						}
 					}
 					tref += (-1024 + (intptr_t)j);
 					tres += r;
+					j = _InterlockedIncrement(&i) - 1;
 				}
 				InterlockedAdd64(&ref, tref);
 				InterlockedAdd64(&res, tres);

@@ -55,6 +55,7 @@ struct SEV_ConcurrentFunctorQueue
 	volatile ptrdiff_t PreWriteIdx;
 
 	SEV_AtomicSharedMutex DeleteLock;
+	volatile long PreLockShared;
 
 };
 
