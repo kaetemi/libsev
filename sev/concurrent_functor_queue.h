@@ -156,11 +156,15 @@ public:
 		{
 			throw std::bad_alloc();
 		}
-		if (en)
+		if (en != ENODATA)
 		{
 			throw std::exception();
 		}
-		// FIXME: Exception catcher should be part of the FunctorVt, capture the exception_ptr or just rethrow a generic exception, depending on whether the function came from a different exception mechanism (log compiler & vc version in vtable) 
+		// FIXME: Exception catcher should be part of the FunctorVt, capture the exception_ptr or just rethrow a generic exception, depending on whether the function came from a different exception mechanism (log compiler & vc version in vtable)
+		// Add a function inline constexpr void *sev::FunctorVt::rethrower() which returns the rethrower that std::rethrow_exception points to
+		// If the rethrower mismatches the rethrower logged by the FunctorVt, then just throw std::exception, otherwise, rethrow since it's a valid exception
+		// Call the functorvt's exception deleter afterwards
+		// Add an InvokeCatch to the functorvt
 		return res;
 	}
 	
