@@ -80,7 +80,7 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) * 8 * 8;
+	const int rounds = (1024 * 1024) * 8 * 1;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -735,7 +735,7 @@ int main()
 		auto f = [](int x, int y) -> int {
 			return x + y;
 		};
-		sev::ConcurrentFunctorQueue<int(int,int)> q;
+		sev::ConcurrentFunctorQueue<int(int,int)> q(256);
 		sev::EventFlag more;
 		volatile bool written = false;
 		delta();
@@ -764,10 +764,11 @@ int main()
 				for (;;)
 				{
 					if (j >= rounds) break;
+					bool w = written;
 					int r = q.tryCallAndPop(success, -1024, j);
 					if (!success)
 					{
-						if (written) break;
+						if (w) break;
 						else
 						{
 							more.wait();
