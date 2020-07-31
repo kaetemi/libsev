@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 
 #define SEV_FUNCTOR_ALIGN_MODMASK ((ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
 #define SEV_FUNCTOR_ALIGN_MASK (~(ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
@@ -254,12 +255,12 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 	}
 }
 
-std::unique_ptr<std::mutex> m(std::make_unique<std::mutex>());
+// std::unique_ptr<std::shared_mutex> m(std::make_unique<std::shared_mutex>());
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
 	// This function only locks while flipping to the next buffer
-	//std::unique_lock<std::mutex> l(*m);
+	// std::shared_lock<std::shared_mutex> sl(*m);
 
 	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
@@ -312,8 +313,10 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			break; // We have a good allocation, using it!
 		}
 
-		// while (me->PreLockShared != 1)
-		// 	SEV_Thread_yield(); // TEMP
+		SEV_ASSERT(preLocked);
+
+		while (me->PreLockShared != 1)
+			SEV_Thread_yield(); // TEMP
 
 		// Writing is now locked, we're safe here until preWriteIdx is written
 		locked = true;
@@ -346,6 +349,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 				errno_t res = errno;
 				SEV_ASSERT(res);
 				me->PreWriteIdx = lockIdx - sz;
+				_InterlockedDecrement(&me->PreLockShared);
 				if (res) return res;
 				return ENOMEM;
 			}
