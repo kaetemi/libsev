@@ -72,7 +72,7 @@ namespace sev {
 struct EventFlagImpl;
 #endif
 
-struct EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
+struct SEV_LIB EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
 {
 public:
 	inline EventFlag(bool manualReset = false, bool initialState = false)
@@ -138,7 +138,7 @@ public:
 	}
 #endif
 
-	inline void wait()
+	SEV_EVENT_FLAG_INLINE void wait()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		HANDLE hEvent = m_Event;
@@ -154,7 +154,7 @@ public:
 #endif
 	}
 
-	inline bool wait(int timeoutMs) // Returns false on timeout
+	SEV_EVENT_FLAG_INLINE bool wait(int timeoutMs) // Returns false on timeout
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		HANDLE hEvent = m_Event;
@@ -173,7 +173,7 @@ public:
 #endif
 	}
 
-	inline void set()
+	SEV_EVENT_FLAG_INLINE void set()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		if (!SetEvent(m_Event))
@@ -183,7 +183,7 @@ public:
 #endif
 	}
 
-	inline void reset()
+	SEV_EVENT_FLAG_INLINE void reset()
 	{
 #ifdef SEV_EVENT_FLAG_WIN32
 		if (!ResetEvent(m_Event))
