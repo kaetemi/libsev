@@ -416,6 +416,38 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	SEV_AtomicSharedMutex_unlockShared(&me->DeleteLock);
 
 	ptrdiff_t readIdx = readBlockPreamble->ReadIdx;
+
+	// Prepare exit, in case of early exit
+	auto fin1 = gsl::finally([&]() -> void {
+		// Wipe flags
+		// ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
+		// for (ptrdiff_t idx = readIdx; readIdx < nextReadIdx; readIdx += SEV_FUNCTOR_ALIGN)
+		// 	((sev::FunctorPreamble *)(&readBlock[readIdx]))->Ready = 0;
+
+		SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
+		long readShared = _InterlockedDecrement(&readBlockPreamble->ReadShared);
+		uint8_t *currentReadBlock = me->ReadBlock;
+		SEV_AtomicSharedMutex_unlockShared(&me->DeleteLock);
+
+		if (currentReadBlock != readBlock) // If this block isn't current anymore
+		{
+			if (!readShared) // New value is 0, no other threads left on this
+			{
+				// printf("--[Free Block (2)]--\n"); // DEBUG
+#ifdef SEV_DEBUG_NB_OBJECTS
+				SEV_ASSERT(!readBlockPreamble->NbObjects);
+#endif
+				SEV_ASSERT(!readBlockPreamble->ReadShared);
+				// Attempt to release or spare the old block
+				// sev::wipeBlockOnly(readBlock); // , blockSize);
+				sev::wipeBlock(readBlock, blockSize);
+				uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), readBlock, null);
+				if (spareBlock) // Old value was not 0, not using this as a spare block
+					SEV_alignedFree(readBlock);
+			}
+		}
+	});
+
 	for (; ; )
 	{
 		const auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readIdx]);
@@ -425,6 +457,8 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 			// Nothing new in this block
 			if (readBlockPreamble->NextBlock) // Next block available
 			{
+				SEV_ASSERT(!(readIdx < blockSize &&functorPreamble->Ready));
+
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
 
@@ -493,41 +527,12 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	SEV_ASSERT(SEV_FUNCTOR_ALIGNED(readPtrIdx) == readPtrIdx);
 
 	// Prepare exit, in case invoke call throws
-	auto fin = gsl::finally([&]() -> void {
+	auto fin2 = gsl::finally([&]() -> void {
 		// Destructor
 		functorPreamble->Vt->Destroy(&readBlock[readPtrIdx]);
-
 #ifdef SEV_DEBUG_NB_OBJECTS
 		_InterlockedDecrement(&readBlockPreamble->NbObjects);
 #endif
-
-		// Wipe flags
-		// ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
-		// for (ptrdiff_t idx = readIdx; readIdx < nextReadIdx; readIdx += SEV_FUNCTOR_ALIGN)
-		// 	((sev::FunctorPreamble *)(&readBlock[readIdx]))->Ready = 0;
-
-		SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
-		long readShared = _InterlockedDecrement(&readBlockPreamble->ReadShared);
-		uint8_t *currentReadBlock = me->ReadBlock;
-		SEV_AtomicSharedMutex_unlockShared(&me->DeleteLock);
-
-		if (currentReadBlock != readBlock) // If this block isn't current anymore
-		{
-			if (!readShared) // New value is 0, no other threads left on this
-			{
-				// printf("--[Free Block (2)]--\n"); // DEBUG
-#ifdef SEV_DEBUG_NB_OBJECTS
-				SEV_ASSERT(!readBlockPreamble->NbObjects);
-#endif
-				SEV_ASSERT(!readBlockPreamble->ReadShared);
-				// Attempt to release or spare the old block
-				// sev::wipeBlockOnly(readBlock); // , blockSize);
-				sev::wipeBlock(readBlock, blockSize);
-				uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), readBlock, null);
-				if (spareBlock) // Old value was not 0, not using this as a spare block
-					SEV_alignedFree(readBlock);
-			}
-		}
 	});
 
 	// Call
