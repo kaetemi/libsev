@@ -272,7 +272,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 				BlockData verifyBlock = { me->WriteBlock };
 				if (block.ptr != verifyBlock.ptr || idx != verifyIdx)
 				{
-					SEV_AtomicSharedMutex_downgradePartialLock(&me->AtomicWriteSwap);
+					SEV_AtomicSharedMutex_downgradeLock(&me->AtomicWriteSwap);
 					idx = SEV_AtomicPtrDiff_load(&me->PreWriteIdx);
 					idxMasked = idx & (blockSize - 1);
 					block.ptr = me->WriteBlock;
@@ -295,7 +295,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 					{
 						errno_t res = errno;
 						SEV_ASSERT(res);
-						SEV_AtomicSharedMutex_downgradePartialLock(&me->AtomicWriteSwap);
+						SEV_AtomicSharedMutex_downgradeLock(&me->AtomicWriteSwap);
 						if (res) return res;
 						return ENOMEM;
 					}
@@ -330,7 +330,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 
 				// Done
 				SEV_ASSERT(allocNextIdx == SEV_AtomicPtrDiff_load(&me->PreWriteIdx)); // Can not change during lock
-				SEV_AtomicSharedMutex_downgradePartialLock(&me->AtomicWriteSwap);
+				SEV_AtomicSharedMutex_downgradeLock(&me->AtomicWriteSwap);
 				idx = allocIdx;
 				idxMasked = allocIdxMasked;
 				block.ptr = allocBlock.ptr;
