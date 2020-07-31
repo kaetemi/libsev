@@ -57,13 +57,7 @@ struct SEV_ConcurrentFunctorQueue
 	SEV_AtomicPtrDiff PreWriteIdx;
 
 	SEV_AtomicSharedMutex AtomicWriteSwap;
-
 	SEV_AtomicSharedMutex DeleteLock;
-	// SEV_AtomicInt32 PreLockShared;
-
-#ifdef SEV_DEBUG_CFQ_PUSH
-	// SEV_AtomicInt32 VerifyAllocLock;
-#endif
 
 };
 

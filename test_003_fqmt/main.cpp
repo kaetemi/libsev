@@ -75,12 +75,12 @@ std::string s_S = "This is really a very long string that definitely won't fit i
 std::string s_T = "This is really a very long string that also won't fit inside the builtin storage"s;
 std::string s_Y = "!"s;
 
-#define DEF_ALL 0
+#define DEF_ALL 1
 
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) * 8 * 1;
+	const int rounds = (1024 * 1024) * 8 * 8;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -316,7 +316,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if DEF_ALL
+#if 1
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) "sv << tc << " threaded with "sv << rounds << " entries each and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -388,7 +388,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0 ///////////
+#if 1 ///////////
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -415,7 +415,7 @@ int main()
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
 #ifdef DO_POPS
-#if 0
+#if 1
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
 		long i = 0;
@@ -488,7 +488,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if 1
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -656,7 +656,7 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if 1
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
@@ -731,13 +731,13 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if 1
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
 			return x + y;
 		};
-		sev::ConcurrentFunctorQueue<int(int,int)> q(256);
+		sev::ConcurrentFunctorQueue<int(int, int)> q; // TESTING: (256);
 		sev::EventFlag more;
 		volatile bool written = false;
 		delta();
