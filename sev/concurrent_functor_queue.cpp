@@ -253,7 +253,14 @@ errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
-	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vt, vt->Size, ptr, forwardConstructor);
+	try
+	{
+		return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vt, vt->Size, ptr, forwardConstructor);
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
 }
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
@@ -348,26 +355,31 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	functorPreamble->Vt = vt;
 	functorPreamble->Size = sz; // Size including preamble and post-padding
 	SEV_ASSERT(((ptrdiff_t)&block[ptrIdx] & SEV_FUNCTOR_ALIGN_MASK) == (ptrdiff_t)&block[ptrIdx]); // Check alignment
+
+	// Prepare commit, in case write throws
+	auto fin = gsl::finally([&]() -> void {
+		// Commit
+		if (locked)
+		{
+			// Unlock
+			SEV_ASSERT(me->PreWriteIdx == lockIdx); // Can't have changed
+			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
+			me->WriteBlock = block;
+			functorPreamble->Ready = 1;
+			prevBlockPreamble->NextBlock = block; // Allow read
+			me->PreWriteIdx = nextIdx; // Unlock write
+		}
+		else
+		{
+			// Flag ready for reader
+			functorPreamble->Ready = 1;
+		}
+
+		SEV_ASSERT(nextIdx <= me->BlockSize);
+	});
+
+	// Really write
 	forwardConstructor(&block[ptrIdx], ptr);
-
-	// Commit
-	if (locked)
-	{
-		// Unlock
-		SEV_ASSERT(me->PreWriteIdx == lockIdx); // Can't have changed
-		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-		me->WriteBlock = block;
-		functorPreamble->Ready = 1;
-		prevBlockPreamble->NextBlock = block; // Allow read
-		me->PreWriteIdx = nextIdx; // Unlock write
-	}
-	else
-	{
-		// Flag ready for reader
-		functorPreamble->Ready = 1;
-	}
-
-	SEV_ASSERT(nextIdx <= me->BlockSize);
 
 	return 0;
 }

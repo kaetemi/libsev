@@ -65,12 +65,13 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, 
 SEV_LIB void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me);
 
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)(void *ptr, void *args), void *ptr, ptrdiff_t size); // Does a memcpy of the data ptr
-SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
-SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other)); // Returns EOTHER if forwardConstructor throws, returns ENOMEM in case of memory allocation failure, 0 if OK
+#ifdef __cplusplus
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other)); // Throws only if forwardConstructor throws
+#endif
 
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args); // Returns ENODATA if nothing to pop, EOTHER if function threw an exception, 0 if OK
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
-
 #ifdef __cplusplus
 SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args); // Throws when function throws and exception
 #endif
