@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "concurrent_functor_queue.h"
 
 #include <thread>
-// #include <mutex>
+#include <mutex>
 
 #define SEV_FUNCTOR_ALIGN_MODMASK ((ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
 #define SEV_FUNCTOR_ALIGN_MASK (~(ptrdiff_t)(SEV_FUNCTOR_ALIGN - 1))
@@ -254,12 +254,12 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, c
 	}
 }
 
-// std::unique_ptr<std::mutex> m(std::make_unique<std::mutex>());
+std::unique_ptr<std::mutex> m(std::make_unique<std::mutex>());
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
 	// This function only locks while flipping to the next buffer
-	// std::unique_lock<std::mutex>(*m);
+	//std::unique_lock<std::mutex> l(*m);
 
 	// https://docs.microsoft.com/en-us/cpp/intrinsics/compiler-intrinsics?view=vs-2019
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
@@ -286,8 +286,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		_InterlockedIncrement(&me->PreLockShared);
 		if (_InterlockedCompareExchangePointer((void *volatile *)(&me->PreWriteIdx), (void *)nextIdx, (void *)idx) != (void *)idx)
 		{
-			// std::this_thread::yield();
 			_InterlockedDecrement(&me->PreLockShared);
+			SEV_Thread_yield();
 			idx = me->PreWriteIdx;
 			block = me->WriteBlock;
 			continue; // Try again, preWriteIdx was channged by another thread
@@ -346,8 +346,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 #ifdef SEV_DEBUG_NB_OBJECTS
 	_InterlockedIncrement(&((sev::BlockPreamble *)block)->NbObjects);
 #endif
-	_InterlockedIncrement(&((sev::BlockPreamble *)block)->PreWriteShared);
-	_InterlockedDecrement(&me->PreLockShared);
+	// _InterlockedIncrement(&((sev::BlockPreamble *)block)->PreWriteShared);
+	// _InterlockedDecrement(&me->PreLockShared);
 	ptrdiff_t ptrIdx = idx + sizeof(sev::FunctorPreamble);
 	sev::FunctorPreamble *functorPreamble = (sev::FunctorPreamble *)&block[idx];
 	functorPreamble->Vt = vt;
@@ -364,10 +364,11 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			me->WriteBlock = block;
 			functorPreamble->Ready = 1;
-			_InterlockedDecrement(&blockPreamble->PreWriteShared);
+			_InterlockedDecrement(&me->PreLockShared);
+			// _InterlockedDecrement(&blockPreamble->PreWriteShared);
 			// Other threads may still be writing Ready flags, don't commit the block yet.
-			while (prevBlockPreamble->PreWriteShared)
-				SEV_Thread_yield();
+			// while (prevBlockPreamble->PreWriteShared)
+			//	SEV_Thread_yield();
 			while (me->PreLockShared)
 				SEV_Thread_yield();
 			prevBlockPreamble->NextBlock = block; // Allow read // FIXME: This can be set by another thread that is not the last one! Need a writing shared counter to wait for 0 before committing the block number! (Increment before getting a lock on the writing, decrement after failing or when ready flag is committed!)
@@ -379,7 +380,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			functorPreamble->Ready = 1;
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			SEV_ASSERT(!blockPreamble->NextBlock);
-			_InterlockedDecrement(&blockPreamble->PreWriteShared);
+			//_InterlockedDecrement(&blockPreamble->PreWriteShared);
+			_InterlockedDecrement(&me->PreLockShared);
 		}
 
 		SEV_ASSERT(nextIdx <= me->BlockSize);
@@ -413,7 +415,7 @@ errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQue
 
 bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
 {
-	// std::unique_lock<std::mutex>(*m);
+	// std::unique_lock<std::mutex> l(*m);
 
 	const ptrdiff_t blockSize = me->BlockSize;
 
