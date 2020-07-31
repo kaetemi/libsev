@@ -366,7 +366,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			me->WriteBlock = block;
 			functorPreamble->Ready = 1;
-			prevBlockPreamble->NextBlock = block; // Allow read
+			prevBlockPreamble->NextBlock = block; // Allow read // FIXME: This can be set by another thread that is not the last one! Need a writing shared counter to wait for 0 before committing the block number! (Increment before getting a lock on the writing, decrement after failing or when ready flag is committed!)
 			me->PreWriteIdx = nextIdx; // Unlock write
 		}
 		else
@@ -434,6 +434,11 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 			if (!readShared) // New value is 0, no other threads left on this
 			{
 				// printf("--[Free Block (2)]--\n"); // DEBUG
+				SEV_ASSERT((uint8_t *)readBlockPreamble == readBlock);
+#ifdef SEV_DEBUG
+				auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readBlockPreamble->ReadIdx]);
+				SEV_ASSERT(!(readBlockPreamble->ReadIdx < blockSize && functorPreamble->Ready));
+#endif
 #ifdef SEV_DEBUG_NB_OBJECTS
 				SEV_ASSERT(!readBlockPreamble->NbObjects);
 #endif
@@ -457,7 +462,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 			// Nothing new in this block
 			if (readBlockPreamble->NextBlock) // Next block available
 			{
-				SEV_ASSERT(!(readIdx < blockSize &&functorPreamble->Ready));
+				SEV_ASSERT(!(readIdx < blockSize && functorPreamble->Ready));
 
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
@@ -477,11 +482,12 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 				}
 				readBlockPreamble = (sev::BlockPreamble *)readBlock;
 				_InterlockedIncrement(&readBlockPreamble->ReadShared);
-				long readShared = _InterlockedDecrement(&oldReadBlock->ReadShared);
-				SEV_AtomicSharedMutex_unlock(&me->DeleteLock);
-#ifdef SEV_DEBUG_NB_OBJECTS
-				// ptrdiff_t oldReadIdx = readIdx; // See oldReadBlock->ReadIdx
+#ifdef SEV_DEBUG
+				SEV_ASSERT(!(readIdx < blockSize && functorPreamble->Ready));
 #endif
+				long readShared = _InterlockedDecrement(&oldReadBlock->ReadShared);
+				SEV_ASSERT(readShared >= 0);
+				SEV_AtomicSharedMutex_unlock(&me->DeleteLock);
 				readIdx = readBlockPreamble->ReadIdx;
 
 				if (!readShared) // New value is 0, no other threads left on this
@@ -510,7 +516,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 			// Try to advance the current index
 			ptrdiff_t currentReadIdx = readIdx;
 			ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
-			if ((readIdx = (ptrdiff_t)_InterlockedCompareExchangePointer((void *volatile *)(&readBlockPreamble->ReadIdx), (void *)nextReadIdx, (void *)readIdx)) != currentReadIdx)
+			if ((readIdx = (ptrdiff_t)_InterlockedCompareExchangePointer((void *volatile *)(&readBlockPreamble->ReadIdx), (void *)nextReadIdx, (void *)currentReadIdx)) != currentReadIdx)
 			{
 				// Other thread already attempted to pop this entry
 				continue; // Check for the next entry
