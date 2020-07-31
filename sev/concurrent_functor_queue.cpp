@@ -509,6 +509,9 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
 
+				// while (SEV_AtomicPtrDiff_load(&me->PreWriteIdx) > me->BlockSize)
+				// 	SEV_Thread_yield();
+
 				// Swap to the next block (if we're still reading the current block) (and fetch the block that's being read now)
 				// readBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->ReadBlock), readBlockPreamble->NextBlock, readBlock);
 				SEV_AtomicSharedMutex_lock(&me->DeleteLock);
