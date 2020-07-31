@@ -372,7 +372,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	return 0;
 }
 
-bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args)
+errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args)
 {
 	typedef void(*TFn)(void *ptr, void *args);
 	return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(me, [](void *args, void *ptr, void *f) -> void {
@@ -380,7 +380,19 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, vo
 	}, args);
 }
 
-bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
+errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
+{
+	try
+	{
+		return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(me, caller, args) ? 0 : ENODATA;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+}
+
+bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
 {
 	const ptrdiff_t blockSize = me->BlockSize;
 

@@ -68,8 +68,12 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, 
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 
-SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args);
-SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args); // Returns ENODATA if nothing to pop, EOTHER if function threw an exception, 0 if OK
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
+
+#ifdef __cplusplus
+SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args); // Throws when function throws and exception
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -130,7 +134,7 @@ public:
 		static const FunctorVt<void(void *, void *)> vt(caller);
 		typedef FunctorVt<void(void *, void *)>::TInvoke TInvoke;
 		static const TInvoke inv = (TInvoke)vt.raw()->Invoke;
-		success = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(&m, inv, (void *)(&caller));
+		success = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, inv, (void *)(&caller));
 		return res;
 	}
 	
