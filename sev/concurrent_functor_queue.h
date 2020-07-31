@@ -160,6 +160,7 @@ public:
 		{
 			throw std::exception();
 		}
+		// FIXME: Exception catcher should be part of the FunctorVt, capture the exception_ptr or just rethrow a generic exception, depending on whether the function came from a different exception mechanism (log compiler & vc version in vtable) 
 		return res;
 	}
 	
