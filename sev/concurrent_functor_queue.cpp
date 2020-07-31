@@ -27,6 +27,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+/*
+Doesn't work yet for multiple reads...
+*/
+
 #include "concurrent_functor_queue.h"
 
 #include <thread>
