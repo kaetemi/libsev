@@ -78,7 +78,7 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
-	const int rounds = (1024 * 1024) * 8 * 4;
+	const int rounds = (1024 * 1024) * 8; // *4;
 	const int tc = 8;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -309,6 +309,9 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
 #if 0
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) "sv << tc << " threaded with "sv << rounds << " entries each and 2 strings"sv << std::endl;
@@ -483,7 +486,92 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 #if 1
 	{
-		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded each with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " entries each and 2 strings"sv << std::endl;
+		std::string s = s_S + s_Y;
+		std::string t = s_T + s_Y;
+		auto f = [s, t](int x, int y) -> int {
+			if (s[0] == 'T' && t[0] == 'T') return x + y;
+			return -1;
+		};
+		concurrency::concurrent_queue<std::function<int(int,int)>> q;
+		sev::EventFlag more;
+		volatile bool written = false;
+		delta();
+		std::thread writeThreads[(tc / 2)];
+		for (int t = 0; t < (tc / 2); ++t)
+		{
+			writeThreads[t] = std::thread([&]() -> void {
+				for (int i = 0; i < rounds / (tc / 2); ++i)
+				{
+					q.push(f);
+					more.set();
+				}
+			});
+		}
+		std::thread readThreads[(tc / 2)];
+		long i = 0;
+		int64_t ref = 0;
+		int64_t res = 0;
+		for (int t = 0; t < (tc / 2); ++t)
+		{
+			readThreads[t] = std::thread([&]() -> void {
+				int64_t tref = 0;
+				int64_t tres = 0;
+				std::function<int(int, int)> fp;
+				while (!written)
+				{
+					while (q.try_pop(fp))
+					{
+						long j = _InterlockedIncrement(&i) - 1;
+						tref += (-1024 + (intptr_t)j);
+						tres += fp(-1024, j);
+					}
+					more.wait();
+				}
+				InterlockedAdd64(&ref, tref);
+				InterlockedAdd64(&res, tres);
+				more.set();
+			});
+		}
+		for (int t = 0; t < (tc / 2); ++t)
+		{
+			writeThreads[t].join();
+		}
+		written = true;
+		more.set();
+		for (int t = 0; t < (tc / 2); ++t)
+		{
+			readThreads[t].join();
+		}
+		ms = delta();
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+#ifdef DO_POPS
+		std::cout << "Test pop()"sv << std::endl;
+		delta();
+		ms = delta();
+		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
+		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
+		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+#endif
+		delta();
+	}
+	{
+		ms = delta();
+		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		delta();
+	}
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+	}
+#endif
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
+#if 1
+	{
+		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
 		std::string t = s_T + s_Y;
 		auto f = [s, t](int x, int y) -> int {
@@ -494,20 +582,22 @@ int main()
 		sev::EventFlag more;
 		volatile bool written = false;
 		delta();
-		std::thread writeThreads[tc];
-		for (int t = 0; t < tc; ++t)
+		std::thread writeThreads[(tc / 2)];
+		for (int t = 0; t < (tc / 2); ++t)
 		{
 			writeThreads[t] = std::thread([&]() -> void {
-				for (int i = 0; i < rounds / tc; ++i)
+				for (int i = 0; i < rounds / (tc / 2); ++i)
+				{
 					q.push(f);
 					more.set();
-				});
+				}
+			});
 		}
-		std::thread readThreads[tc];
+		std::thread readThreads[(tc / 2)];
 		long i = 0;
 		int64_t ref = 0;
 		int64_t res = 0;
-		for (int t = 0; t < tc; ++t)
+		for (int t = 0; t < (tc / 2); ++t)
 		{
 			readThreads[t] = std::thread([&]() -> void {
 				int64_t tref = 0;
@@ -532,13 +622,13 @@ int main()
 				more.set();
 			});
 		}
-		for (int t = 0; t < tc; ++t)
+		for (int t = 0; t < (tc / 2); ++t)
 		{
 			writeThreads[t].join();
 		}
 		written = true;
 		more.set();
-		for (int t = 0; t < tc; ++t)
+		for (int t = 0; t < (tc / 2); ++t)
 		{
 			readThreads[t].join();
 		}
