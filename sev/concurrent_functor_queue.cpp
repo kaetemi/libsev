@@ -51,7 +51,7 @@ struct BlockPreamble
 
 	ptrdiff_t ReadIdx;
 	long ReadShared;
-	long PreWriteShared;
+	// long PreWriteShared;
 
 #ifdef SEV_DEBUG_NB_OBJECTS
 	long NbObjects;
@@ -80,7 +80,7 @@ void wipeBlockOnly(void *block)
 	blockPreamble->NextBlock = null;
 	blockPreamble->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	blockPreamble->ReadShared = 0;
-	blockPreamble->PreWriteShared = 0;
+	// blockPreamble->PreWriteShared = 0;
 #ifdef SEV_DEBUG_NB_OBJECTS
 	blockPreamble->NbObjects = 0;
 #endif
@@ -299,6 +299,9 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			break; // We have a good allocation, using it!
 		}
 
+		while (me->PreLockShared != 1)
+			SEV_Thread_yield(); // TEMP
+
 		// Writing is now locked, we're safe here until preWriteIdx is written
 		locked = true;
 		lockIdx = nextIdx;
@@ -364,11 +367,14 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			me->WriteBlock = block;
 			functorPreamble->Ready = 1;
+			// _InterlockedExchangePointer((void *volatile*)(&functorPreamble->Ready), (void *)1);
 			_InterlockedDecrement(&me->PreLockShared);
+			SEV_ASSERT(me->PreLockShared >= 0);
 			// _InterlockedDecrement(&blockPreamble->PreWriteShared);
 			// Other threads may still be writing Ready flags, don't commit the block yet.
 			// while (prevBlockPreamble->PreWriteShared)
 			//	SEV_Thread_yield();
+			SEV_ASSERT(!me->PreLockShared); // TEMP: Since we waited earlier already
 			while (me->PreLockShared)
 				SEV_Thread_yield();
 			prevBlockPreamble->NextBlock = block; // Allow read // FIXME: This can be set by another thread that is not the last one! Need a writing shared counter to wait for 0 before committing the block number! (Increment before getting a lock on the writing, decrement after failing or when ready flag is committed!)
@@ -378,10 +384,12 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		{
 			// Flag ready for reader
 			functorPreamble->Ready = 1;
+			// _InterlockedExchangePointer((void *volatile*)(&functorPreamble->Ready), (void *)1);
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 			SEV_ASSERT(!blockPreamble->NextBlock);
 			//_InterlockedDecrement(&blockPreamble->PreWriteShared);
 			_InterlockedDecrement(&me->PreLockShared);
+			SEV_ASSERT(me->PreLockShared >= 0);
 		}
 
 		SEV_ASSERT(nextIdx <= me->BlockSize);
