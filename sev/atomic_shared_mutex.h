@@ -39,19 +39,173 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
+typedef volatile LONG SEV_AtomicInt32;
+typedef volatile ptrdiff_t SEV_AtomicPtrDiff;
+typedef volatile PVOID SEV_AtomicPtr;
+
+static_assert(sizeof(int32_t) == sizeof(SEV_AtomicInt32));
+static_assert(sizeof(ptrdiff_t) == sizeof(SEV_AtomicPtrDiff));
+static_assert(sizeof(void *) == sizeof(SEV_AtomicPtr));
+
+static inline int32_t SEV_AtomicInt32_load(SEV_AtomicInt32 *src)
+{
+#ifdef _WIN32
+	return InterlockedCompareExchange(src, 0, 0);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void SEV_AtomicInt32_store(SEV_AtomicInt32 *dst, int32_t val)
+{
+#ifdef _WIN32
+	InterlockedExchange(dst, val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline int32_t SEV_AtomicInt32_exchange(SEV_AtomicInt32 *dst, int32_t val)
+{
+#ifdef _WIN32
+	return InterlockedExchange(dst, val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline int32_t SEV_AtomicInt32_compareExchange(SEV_AtomicInt32 *dst, int32_t exch, int32_t comp)
+{
+#ifdef _WIN32
+	return InterlockedCompareExchange(dst, exch, comp);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline int32_t SEV_AtomicInt32_increment(SEV_AtomicInt32 *var)
+{
+#ifdef _WIN32
+	return InterlockedIncrement(var);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline int32_t SEV_AtomicInt32_decrement(SEV_AtomicInt32 *var)
+{
+#ifdef _WIN32
+	return InterlockedDecrement(var);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline ptrdiff_t SEV_AtomicPtrDiff_load(SEV_AtomicPtrDiff *src)
+{
+#ifdef _WIN32
+	return (ptrdiff_t)InterlockedCompareExchangePointer((volatile PVOID *)src, null,null);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void SEV_AtomicPtrDiff_store(SEV_AtomicPtrDiff *dst, ptrdiff_t val)
+{
+#ifdef _WIN32
+	InterlockedExchangePointer((volatile PVOID *)dst, (PVOID)val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline ptrdiff_t SEV_AtomicPtrDiff_exchange(SEV_AtomicPtrDiff *dst, ptrdiff_t val)
+{
+#ifdef _WIN32
+	return (ptrdiff_t)InterlockedExchangePointer((volatile PVOID *)dst, (PVOID)val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline ptrdiff_t SEV_AtomicPtrDiff_compareExchange(SEV_AtomicPtrDiff *dst, ptrdiff_t exch, ptrdiff_t comp)
+{
+#ifdef _WIN32
+	return (ptrdiff_t)InterlockedCompareExchangePointer((volatile PVOID *)dst, (PVOID)exch, (PVOID)comp);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline ptrdiff_t SEV_AtomicPtrDiff_increment(SEV_AtomicPtrDiff *var)
+{
+#ifdef _WIN32
+	return InterlockedIncrementSizeT(var);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline ptrdiff_t SEV_AtomicPtrDiff_decrement(SEV_AtomicPtrDiff *var)
+{
+#ifdef _WIN32
+	return InterlockedDecrementSizeT(var);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void *SEV_AtomicPtr_load(SEV_AtomicPtr *src)
+{
+#ifdef _WIN32
+	return (void *)InterlockedCompareExchangePointer(src, null,null);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void SEV_AtomicPtr_store(SEV_AtomicPtr *dst, void *val)
+{
+#ifdef _WIN32
+	InterlockedExchangePointer(dst, val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void *SEV_AtomicPtr_exchange(SEV_AtomicPtr *dst, void *val)
+{
+#ifdef _WIN32
+	return InterlockedExchangePointer(dst, val);
+#else
+	static_assert(false);
+#endif
+}
+
+static inline void *SEV_AtomicPtr_compareExchange(SEV_AtomicPtr *dst, void *exch, void *comp)
+{
+#ifdef _WIN32
+	return InterlockedCompareExchangePointer(dst, exch, comp);
+#else
+	static_assert(false);
+#endif
+}
+
 static inline void SEV_Thread_yield()
 {
 #ifdef _WIN32
 	SwitchToThread();
+#elif __cplusplus
+	std::this_thread::yield();
 #else
-	std::this_thread::yield(); // TODO
+	static_assert(false);
 #endif
 }
 
 struct SEV_AtomicSharedMutex
 {
-	volatile long Unique; // 0 or 1
-	volatile long Sharing; // 0 to infinity-ish
+	SEV_AtomicInt32 Unique; // 0 or 1
+	SEV_AtomicInt32 Sharing; // 0 to infinity-ish
 
 };
 
@@ -62,11 +216,11 @@ static inline void SEV_AtomicSharedMutex_init(SEV_AtomicSharedMutex *me)
 
 static inline bool SEV_AtomicSharedMutex_tryLock(SEV_AtomicSharedMutex *me)
 {
-	if (_InterlockedExchange(&me->Unique, 1))
+	if (SEV_AtomicInt32_exchange(&me->Unique, 1))
 		return false; // Already locked for unique
-	if (me->Sharing) // Successfully locked for unique, but busy sharing
+	if (SEV_AtomicInt32_load(&me->Sharing)) // Successfully locked for unique, but busy sharing
 	{
-		me->Unique = 0; // Unlock unique
+		SEV_AtomicInt32_store(&me->Unique, 0); // Unlock unique
 		return false; // Already busy for sharing
 	}
 	return true; // Successfully locked for unique and sharing
@@ -74,9 +228,9 @@ static inline bool SEV_AtomicSharedMutex_tryLock(SEV_AtomicSharedMutex *me)
 
 static inline void SEV_AtomicSharedMutex_lock(SEV_AtomicSharedMutex *me)
 {
-	while (_InterlockedExchange(&me->Unique, 1))
+	while (SEV_AtomicInt32_exchange(&me->Unique, 1))
 		SEV_Thread_yield();
-	while (me->Sharing)
+	while (SEV_AtomicInt32_load(&me->Sharing))
 		SEV_Thread_yield();
 }
 
@@ -92,10 +246,10 @@ static inline void SEV_AtomicSharedMutex_unlock(SEV_AtomicSharedMutex *me)
 
 static inline bool SEV_AtomicSharedMutex_tryLockShared(SEV_AtomicSharedMutex *me)
 {
-	_InterlockedIncrement(&me->Sharing);
+	SEV_AtomicInt32_increment(&me->Sharing);
 	if (me->Unique)
 	{
-		_InterlockedDecrement(&me->Sharing);
+		SEV_AtomicInt32_decrement(&me->Sharing);
 		return false;
 	}
 	return true;
@@ -103,19 +257,19 @@ static inline bool SEV_AtomicSharedMutex_tryLockShared(SEV_AtomicSharedMutex *me
 
 static inline void SEV_AtomicSharedMutex_lockShared(SEV_AtomicSharedMutex *me)
 {
-	_InterlockedIncrement(&me->Sharing);
+	SEV_AtomicInt32_increment(&me->Sharing);
 	while (me->Unique)
 	{
-		_InterlockedDecrement(&me->Sharing);
+		SEV_AtomicInt32_decrement(&me->Sharing);
 		while (me->Unique)
 			SEV_Thread_yield();
-		_InterlockedIncrement(&me->Sharing);
+		SEV_AtomicInt32_increment(&me->Sharing);
 	}
 }
 
 static inline void SEV_AtomicSharedMutex_unlockShared(SEV_AtomicSharedMutex *me)
 {
-	_InterlockedDecrement(&me->Sharing);
+	SEV_AtomicInt32_decrement(&me->Sharing);
 }
 
 #ifdef __cplusplus

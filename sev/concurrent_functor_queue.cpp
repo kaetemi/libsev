@@ -52,14 +52,14 @@ namespace /* anonymous */ {
 
 struct BlockPreamble
 {
-	volatile uint8_t *volatile NextBlock;
+	SEV_AtomicPtr NextBlock;
 
-	volatile ptrdiff_t ReadIdx;
-	volatile long ReadShared;
+	SEV_AtomicPtrDiff ReadIdx;
+	SEV_AtomicInt32 ReadShared;
 	// volatile long PreWriteShared;
 
 #ifdef SEV_DEBUG_NB_OBJECTS
-	volatile long NbObjects;
+	SEV_AtomicInt32 NbObjects;
 #endif
 
 	// TODO: Might be interesting to have a Shared count that includes the number of items remaining in the block + count 1 while it's in ReadBlock + count 1 while it's in WriteBlock
@@ -71,17 +71,17 @@ struct FunctorPreamble
 #ifdef SEV_PREAMBLE_EXTRA
 	void *Extra;
 #endif
-	volatile ptrdiff_t Ready;
+	SEV_AtomicPtrDiff Ready;
 	const SEV_FunctorVt *Vt;
 	ptrdiff_t Size;
 };
 
 #define SEV_BLOCK_PREAMBLE_SIZE (SEV_FUNCTOR_ALIGNED(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble)))
 
-void wipeBlockOnly(volatile void *block)
+void wipeBlockOnly(void *block)
 {
-	volatile uint8_t *b = (volatile uint8_t *)block;
-	volatile BlockPreamble *blockPreamble = (volatile BlockPreamble *)block;
+	uint8_t *b = (uint8_t *)block;
+	BlockPreamble *blockPreamble = (BlockPreamble *)block;
 	blockPreamble->NextBlock = null;
 	blockPreamble->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	blockPreamble->ReadShared = 0;
@@ -91,12 +91,12 @@ void wipeBlockOnly(volatile void *block)
 #endif
 }
 
-void wipeBlock(volatile void *block, ptrdiff_t blockSize)
+void wipeBlock(void *block, ptrdiff_t blockSize)
 {
 	wipeBlockOnly(block);
-	volatile uint8_t *b = (volatile uint8_t *)block;
+	uint8_t *b = (uint8_t *)block;
 	for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
-		((volatile sev::FunctorPreamble *)&b[i])->Ready = 0;
+		((sev::FunctorPreamble *)&b[i])->Ready = 0;
 }
 
 } /* anonymous namespace */
@@ -148,13 +148,14 @@ errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_
 void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 {
 	// Do not release while threads are still accessing this object!
+	SEV_ASSERT(!me->PreLockShared);
 
-	SEV_alignedFree((void *)me->SpareBlock);
+	SEV_alignedFree(me->SpareBlock);
 #ifdef SEV_DEBUG
 	me->SpareBlock = null;
 #endif
 	// ptrdiff_t idx = me->ReadIdx;
-	volatile uint8_t *block = me->ReadBlock;
+	uint8_t *block = (uint8_t *)me->ReadBlock;
 	const ptrdiff_t blockSize = me->BlockSize;
 #ifdef SEV_DEBUG
 	me->ReadBlock = null;
@@ -171,7 +172,7 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 				break; // No more remaining functors
 			functorPreamble->Vt->Destroy((void *)&block[ptrIdx]);
 		}
-		volatile uint8_t *nextBlock = blockPreamble->NextBlock;
+		uint8_t *nextBlock = (uint8_t *)blockPreamble->NextBlock;
 		SEV_alignedFree((void *)block);
 		block = nextBlock;
 	}
@@ -272,8 +273,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	const ptrdiff_t blockSize = me->BlockSize;
 	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockSize)
 		return ENOMEM;
-	ptrdiff_t idx = me->PreWriteIdx;
-	volatile uint8_t *block = me->WriteBlock;
+	ptrdiff_t idx = SEV_AtomicPtrDiff_load(&me->PreWriteIdx);
+	uint8_t *block = (uint8_t *)SEV_AtomicPtr_load(&me->WriteBlock);
 	ptrdiff_t nextIdx;
 	bool locked = false;
 	ptrdiff_t lockIdx;
@@ -285,29 +286,29 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		{
 			if (preLocked)
 			{
-				_InterlockedDecrement(&me->PreLockShared);
+				SEV_AtomicInt32_decrement(&me->PreLockShared);
 				preLocked = false;
 			}
 			do
 			{
 				// Existing preWriteIdx exceeds block size, it means we're allocating in another thread
 				SEV_Thread_yield();
-				idx = me->PreWriteIdx;
-				block = me->WriteBlock; // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
+				idx = SEV_AtomicPtrDiff_load(&me->PreWriteIdx);
+				block = (uint8_t *)SEV_AtomicPtr_load(&me->WriteBlock); // If the block and index change, we'll either have (old idx, old block), (old idx, new block), or (new idx, new block), which is safe here
 			} while (idx > blockSize);
 		}
 		nextIdx = idx + sz;
 		if (!preLocked)
 		{
-			_InterlockedIncrement(&me->PreLockShared);
+			SEV_AtomicInt32_increment(&me->PreLockShared);
 			preLocked = true;
 		}
-		if (_InterlockedCompareExchangePointer((void *volatile *)(&me->PreWriteIdx), (void *)nextIdx, (void *)idx) != (void *)idx)
+		if (SEV_AtomicPtrDiff_compareExchange(&me->PreWriteIdx, nextIdx, idx) != idx)
 		{
 			// _InterlockedDecrement(&me->PreLockShared);
 			// SEV_Thread_yield();
-			idx = me->PreWriteIdx;
-			block = me->WriteBlock;
+			idx = SEV_AtomicPtrDiff_load(&me->PreWriteIdx);
+			block = (uint8_t *)SEV_AtomicPtr_load(&me->WriteBlock);
 			continue; // Try again, preWriteIdx was channged by another thread
 		}
 
@@ -319,14 +320,14 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 
 		SEV_ASSERT(preLocked);
 
-		while (me->PreLockShared != 1)
-			SEV_Thread_yield(); // TEMP
+		//while (me->PreLockShared != 1)
+		//	SEV_Thread_yield(); // TEMP
 
 		// Writing is now locked, we're safe here until preWriteIdx is written
 		locked = true;
 		lockIdx = nextIdx;
 		prevBlockPreamble = (sev::BlockPreamble *)block;
-		SEV_ASSERT(me->PreWriteIdx == nextIdx); // Can't have changed since locking
+		SEV_ASSERT(SEV_AtomicPtrDiff_load(&me->PreWriteIdx) == nextIdx); // Can't have changed since locking
 
 		// Start from the beginning, offset alignment
 		static_assert((SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)) >= sizeof(sev::BlockPreamble));
@@ -335,13 +336,13 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 
 		// Switch to next write buffer block
 		// printf("--[Push Block]--\n"); // DEBUG
-		block = (uint8_t *)_InterlockedExchangePointer((void *volatile *)(&me->SpareBlock), null); // Get spare and switch to null
+		block = (uint8_t *)SEV_AtomicPtr_exchange(&me->SpareBlock, null); // Get spare and switch to null
 		if (block)
 		{
 			// Reuse leftover block
-			SEV_ASSERT(prevBlockPreamble->NextBlock == null); // Can't have been set
+			SEV_ASSERT(SEV_AtomicPtr_load(&prevBlockPreamble->NextBlock) == null); // Can't have been set
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-			SEV_ASSERT(blockPreamble->NextBlock == null); // Can't have been set
+			SEV_ASSERT(SEV_AtomicPtr_load(&blockPreamble->NextBlock) == null); // Can't have been set
 			(void)blockPreamble; // Unused warning
 		}
 		else
@@ -352,8 +353,8 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			{
 				errno_t res = errno;
 				SEV_ASSERT(res);
-				me->PreWriteIdx = lockIdx - sz;
-				_InterlockedDecrement(&me->PreLockShared);
+				SEV_AtomicPtrDiff_store(&me->PreWriteIdx, lockIdx - sz);
+				SEV_AtomicInt32_decrement(&me->PreLockShared);
 				if (res) return res;
 				return ENOMEM;
 			}
@@ -361,7 +362,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		}
 
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-		blockPreamble->NextBlock = null;
+		SEV_AtomicPtr_store(&blockPreamble->NextBlock, null);
 
 		break;
 	}
@@ -369,10 +370,10 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	// Write
 	SEV_ASSERT(preLocked);
 #ifdef SEV_DEBUG_NB_OBJECTS
-	_InterlockedIncrement(&((sev::BlockPreamble *)block)->NbObjects);
+	SEV_AtomicInt32_increment(&((sev::BlockPreamble *)block)->NbObjects);
 #endif
-	// _InterlockedIncrement(&((sev::BlockPreamble *)block)->PreWriteShared);
-	// _InterlockedDecrement(&me->PreLockShared);
+	// SEV_AtomicInt32_increment(&((sev::BlockPreamble *)block)->PreWriteShared);
+	// SEV_AtomicInt32_decrement(&me->PreLockShared);
 	ptrdiff_t ptrIdx = idx + sizeof(sev::FunctorPreamble);
 	sev::FunctorPreamble *functorPreamble = (sev::FunctorPreamble *)&block[idx];
 	functorPreamble->Vt = vt;
@@ -385,33 +386,33 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 		if (locked)
 		{
 			// Unlock
-			SEV_ASSERT(me->PreWriteIdx == lockIdx); // Can't have changed
+			SEV_ASSERT(SEV_AtomicPtrDiff_load(&me->PreWriteIdx) == lockIdx); // Can't have changed
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-			me->WriteBlock = block;
-			functorPreamble->Ready = 1;
+			SEV_AtomicPtr_store(&me->WriteBlock, block);
+			SEV_AtomicPtrDiff_store(&functorPreamble->Ready, 1);
 			// _InterlockedExchangePointer((void *volatile*)(&functorPreamble->Ready), (void *)1);
-			_InterlockedDecrement(&me->PreLockShared);
-			SEV_ASSERT(me->PreLockShared >= 0);
+			SEV_AtomicInt32_decrement(&me->PreLockShared);
+			SEV_ASSERT(SEV_AtomicInt32_load(&me->PreLockShared) >= 0);
 			// _InterlockedDecrement(&blockPreamble->PreWriteShared);
 			// Other threads may still be writing Ready flags, don't commit the block yet.
 			// while (prevBlockPreamble->PreWriteShared)
 			//	SEV_Thread_yield();
 			// SEV_ASSERT(!me->PreLockShared); // TEMP: Since we waited earlier already
-			while (me->PreLockShared)
+			while (SEV_AtomicInt32_load(&me->PreLockShared))
 				SEV_Thread_yield();
-			prevBlockPreamble->NextBlock = block; // Allow read // FIXME: This can be set by another thread that is not the last one! Need a writing shared counter to wait for 0 before committing the block number! (Increment before getting a lock on the writing, decrement after failing or when ready flag is committed!)
-			me->PreWriteIdx = nextIdx; // Unlock write
+			SEV_AtomicPtr_store(&prevBlockPreamble->NextBlock, block); // Allow read // FIXME: This can be set by another thread that is not the last one! Need a writing shared counter to wait for 0 before committing the block number! (Increment before getting a lock on the writing, decrement after failing or when ready flag is committed!)
+			SEV_AtomicPtrDiff_store(&me->PreWriteIdx, nextIdx); // Unlock write
 		}
 		else
 		{
 			// Flag ready for reader
-			functorPreamble->Ready = 1;
+			SEV_AtomicPtrDiff_store(&functorPreamble->Ready, 1);
 			// _InterlockedExchangePointer((void *volatile*)(&functorPreamble->Ready), (void *)1);
 			sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
-			SEV_ASSERT(!blockPreamble->NextBlock);
+			SEV_ASSERT(!SEV_AtomicPtr_load(&blockPreamble->NextBlock));
 			//_InterlockedDecrement(&blockPreamble->PreWriteShared);
-			_InterlockedDecrement(&me->PreLockShared);
-			SEV_ASSERT(me->PreLockShared >= 0);
+			SEV_AtomicInt32_decrement(&me->PreLockShared);
+			SEV_ASSERT(SEV_AtomicInt32_load(&me->PreLockShared) >= 0);
 		}
 
 		SEV_ASSERT(nextIdx <= me->BlockSize);
@@ -451,12 +452,12 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 
 	// Safely get the reading block, and increment the sharing counter
 	SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
-	volatile uint8_t *readBlock = me->ReadBlock;
+	uint8_t *readBlock = (uint8_t *)SEV_AtomicPtr_load(&me->ReadBlock);
 	auto readBlockPreamble = (sev::BlockPreamble *)readBlock;
-	_InterlockedIncrement(&readBlockPreamble->ReadShared);
+	SEV_AtomicInt32_increment(&readBlockPreamble->ReadShared);
 	SEV_AtomicSharedMutex_unlockShared(&me->DeleteLock);
 
-	ptrdiff_t readIdx = readBlockPreamble->ReadIdx;
+	ptrdiff_t readIdx = SEV_AtomicPtrDiff_load(&readBlockPreamble->ReadIdx);
 
 	// Prepare exit, in case of early exit
 	auto fin1 = gsl::finally([&]() -> void {
@@ -466,8 +467,8 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 		// 	((sev::FunctorPreamble *)(&readBlock[readIdx]))->Ready = 0;
 
 		SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
-		long readShared = _InterlockedDecrement(&readBlockPreamble->ReadShared);
-		volatile uint8_t *currentReadBlock = me->ReadBlock;
+		long readShared = SEV_AtomicInt32_decrement(&readBlockPreamble->ReadShared);
+		uint8_t *currentReadBlock = (uint8_t *)SEV_AtomicPtr_load(&me->ReadBlock);
 		SEV_AtomicSharedMutex_unlockShared(&me->DeleteLock);
 
 		if (currentReadBlock != readBlock) // If this block isn't current anymore
@@ -481,13 +482,13 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 				SEV_ASSERT(!(readBlockPreamble->ReadIdx < blockSize && functorPreamble->Ready));
 #endif
 #ifdef SEV_DEBUG_NB_OBJECTS
-				SEV_ASSERT(!readBlockPreamble->NbObjects);
+				SEV_ASSERT(!SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
 #endif
-				SEV_ASSERT(!readBlockPreamble->ReadShared);
+				SEV_ASSERT(!SEV_AtomicInt32_load(&readBlockPreamble->ReadShared));
 				// Attempt to release or spare the old block
 				// sev::wipeBlockOnly(readBlock); // , blockSize);
 				sev::wipeBlock(readBlock, blockSize);
-				uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), (void *)readBlock, null);
+				uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlock, readBlock, null);
 				if (spareBlock) // Old value was not 0, not using this as a spare block
 					SEV_alignedFree((void *)readBlock);
 			}
@@ -497,13 +498,13 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	for (; ; )
 	{
 		const auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readIdx]);
-		const bool ready = readIdx < blockSize && functorPreamble->Ready;
+		const bool ready = readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready);
 		if (!ready) // No more read space, or flag not set
 		{
 			// Nothing new in this block
-			if (readBlockPreamble->NextBlock) // Next block available
+			if (SEV_AtomicPtr_load(&readBlockPreamble->NextBlock)) // Next block available
 			{
-				SEV_ASSERT(!(readIdx < blockSize && functorPreamble->Ready));
+				SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
 
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
@@ -511,37 +512,37 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 				// Swap to the next block (if we're still reading the current block) (and fetch the block that's being read now)
 				// readBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->ReadBlock), readBlockPreamble->NextBlock, readBlock);
 				SEV_AtomicSharedMutex_lock(&me->DeleteLock);
-				if (me->ReadBlock == readBlock)
+				if (SEV_AtomicPtr_load(&me->ReadBlock) == readBlock)
 				{
 					// printf("--[Pop Block]--\n"); // DEBUG
-					readBlock = readBlockPreamble->NextBlock;
-					me->ReadBlock = readBlock;
+					readBlock = (uint8_t *)SEV_AtomicPtr_load(&readBlockPreamble->NextBlock);
+					SEV_AtomicPtr_store(&me->ReadBlock, readBlock);
 				}
 				else
 				{
-					readBlock = me->ReadBlock;
+					readBlock = (uint8_t *)SEV_AtomicPtr_load(&me->ReadBlock);
 				}
 				readBlockPreamble = (sev::BlockPreamble *)readBlock;
-				_InterlockedIncrement(&readBlockPreamble->ReadShared);
+				SEV_AtomicInt32_increment(&readBlockPreamble->ReadShared);
 #ifdef SEV_DEBUG
-				SEV_ASSERT(!(readIdx < blockSize && functorPreamble->Ready));
+				SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
 #endif
-				long readShared = _InterlockedDecrement(&oldReadBlock->ReadShared);
+				long readShared = SEV_AtomicInt32_decrement(&oldReadBlock->ReadShared);
 				SEV_ASSERT(readShared >= 0);
 				SEV_AtomicSharedMutex_unlock(&me->DeleteLock);
-				readIdx = readBlockPreamble->ReadIdx;
+				readIdx = SEV_AtomicPtrDiff_load(&readBlockPreamble->ReadIdx);
 
 				if (!readShared) // New value is 0, no other threads left on this
 				{
 					// printf("--[Free Block (1)]--\n"); // DEBUG
 #ifdef SEV_DEBUG_NB_OBJECTS
-					SEV_ASSERT(!oldReadBlock->NbObjects);
+					SEV_ASSERT(!SEV_AtomicInt32_load(&oldReadBlock->NbObjects));
 #endif
-					SEV_ASSERT(!oldReadBlock->ReadShared);
+					SEV_ASSERT(!SEV_AtomicInt32_load(&oldReadBlock->ReadShared));
 					// Attempt to release or spare the old block
 					// sev::wipeBlockOnly(oldReadBlock); // , blockSize);
 					sev::wipeBlock(oldReadBlock, blockSize);
-					uint8_t *spareBlock = (uint8_t *)_InterlockedCompareExchangePointer((void *volatile *)(&me->SpareBlock), oldReadBlock, null);
+					uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlock, oldReadBlock, null);
 					if (spareBlock) // Old value was not 0, not using this as a spare block
 						SEV_alignedFree(oldReadBlock);
 				}
@@ -557,7 +558,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 			// Try to advance the current index
 			ptrdiff_t currentReadIdx = readIdx;
 			ptrdiff_t nextReadIdx = readIdx + functorPreamble->Size;
-			if ((readIdx = (ptrdiff_t)_InterlockedCompareExchangePointer((void *volatile *)(&readBlockPreamble->ReadIdx), (void *)nextReadIdx, (void *)currentReadIdx)) != currentReadIdx)
+			if ((readIdx = SEV_AtomicPtrDiff_compareExchange(&readBlockPreamble->ReadIdx, nextReadIdx, currentReadIdx)) != currentReadIdx)
 			{
 				// Other thread already attempted to pop this entry
 				continue; // Check for the next entry
@@ -578,7 +579,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 		// Destructor
 		functorPreamble->Vt->Destroy((void *)&readBlock[readPtrIdx]);
 #ifdef SEV_DEBUG_NB_OBJECTS
-		_InterlockedDecrement(&readBlockPreamble->NbObjects);
+		SEV_AtomicInt32_decrement(&readBlockPreamble->NbObjects);
 #endif
 	});
 

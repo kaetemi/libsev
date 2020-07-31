@@ -48,14 +48,14 @@ extern "C" {
 struct SEV_ConcurrentFunctorQueue
 {
 	ptrdiff_t BlockSize;
-	volatile uint8_t *volatile ReadBlock;
-	volatile uint8_t *volatile WriteBlock;
-	volatile uint8_t *volatile SpareBlock;
+	SEV_AtomicPtr ReadBlock;
+	SEV_AtomicPtr WriteBlock;
+	SEV_AtomicPtr SpareBlock;
 
-	volatile ptrdiff_t PreWriteIdx;
+	SEV_AtomicPtrDiff PreWriteIdx;
 
 	SEV_AtomicSharedMutex DeleteLock;
-	volatile long PreLockShared;
+	SEV_AtomicInt32 PreLockShared;
 
 };
 
