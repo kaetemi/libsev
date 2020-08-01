@@ -39,6 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/functor_vt.h>
 #include <sev/functor_view.h>
 #include <sev/concurrent_functor_queue.h>
+#include <psapi.h>
 
 /*
 */
@@ -80,8 +81,12 @@ std::string s_Y = "!"s;
 int main()
 {
 #define DO_POPS
+	const int loop = 16;
+	int lc = 0;
 	const int rounds = (1024 * 1024) * 8 * 4;
 	const int tc = 8;
+	PERFORMACE_INFORMATION pi;
+Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -91,6 +96,8 @@ int main()
 	{
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 	}
 	std::chrono::time_point t0 = std::chrono::steady_clock::now();
 	int64_t ms;
@@ -119,6 +126,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -169,6 +178,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		// Check committed memory consumption!!
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
@@ -219,6 +230,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -249,6 +262,8 @@ int main()
 	{
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 	}
 #endif
 	//////////////////////////////////////////////////////////////////////
@@ -270,6 +285,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -298,6 +315,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -342,6 +361,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -414,6 +435,8 @@ int main()
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 #ifdef DO_POPS
 #if 1
 		std::cout << "Test pop()"sv << std::endl;
@@ -551,6 +574,8 @@ int main()
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -638,6 +663,8 @@ int main()
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -716,6 +743,8 @@ int main()
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -807,6 +836,8 @@ int main()
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << " / "sv << i2 << " / "sv << rounds << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
+		if (GetPerformanceInfo(&pi, sizeof(pi)))
+			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
 		delta();
 	}
 	{
@@ -825,6 +856,9 @@ int main()
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+	++lc;
+	if (lc < loop)
+		goto Again;
 }
 
 /* end of file */

@@ -111,7 +111,7 @@ using std::nothrow;
 #if defined(_DEBUG) && !defined(NDEBUG)
 #define SEV_DEBUG
 #else
-#define SEV_DEBUG // SEV_RELEASE
+#define SEV_RELEASE
 #endif
 
 // Assert

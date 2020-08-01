@@ -13,6 +13,7 @@ ADD_EXECUTABLE(test_003_fqmt
 
 TARGET_LINK_LIBRARIES(test_003_fqmt
   sev
+  psapi
 )
 
 #ADD_DEFINITIONS(-DSEV_LIB_STATIC)
