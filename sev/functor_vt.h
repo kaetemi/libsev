@@ -216,19 +216,9 @@ public:
 		if (err == SEV_throwBadAlloc) throw std::bad_alloc();
 		if (err == SEV_throwBadFunctionCall) throw std::bad_function_call();
 		if (m.Rethrower != impl::rethrower()) throw std::bad_exception(); // Exception comes from elsewhere!
-		auto fin = gsl::finally([&m, err]() { m.DestroyException(err); });
-		std::rethrow_exception((std::exception_ptr *)err);
+		auto fin = gsl::finally([this, err]() { m.DestroyException(err); });
+		std::rethrow_exception(*(std::exception_ptr *)err);
 	}
-
-	/*
-	const ptrdiff_t Size;
-
-	const TInvoke Invoke;
-	const TDestroy Destroy;
-	const TConstCopyConstructor ConstCopyConstructor;
-	const TCopyConstructor CopyConstructor;
-	const TMoveConstructor MoveConstructor;
-	*/
 
 private:
 	const SEV_FunctorVt m;

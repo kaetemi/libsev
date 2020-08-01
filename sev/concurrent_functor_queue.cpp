@@ -413,7 +413,7 @@ errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQue
 {
 	try
 	{
-		return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(me, caller, args) ? 0 : ENODATA;
+		return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(me, null, caller, args) ? 0 : ENODATA;
 	}
 	catch (...)
 	{
@@ -421,7 +421,7 @@ errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQue
 	}
 }
 
-bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
+bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt **vt, void(*caller)(void *args, void *ptr, void *f), void *args)
 {
 	// std::unique_lock<std::shared_mutex> l(*m);
 
@@ -572,7 +572,15 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	// Call
 	SEV_ASSERT(SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
 	SEV_ASSERT(SEV_AtomicPtrDiff_load(&functorPreamble->Ready));
-	caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->Invoke);
+	if (vt)
+	{
+		*vt = functorPreamble->Vt;
+		caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->InvokeCatch);
+	}
+	else
+	{
+		caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->Invoke);
+	}
 	return true;
 }
 
