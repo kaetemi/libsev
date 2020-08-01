@@ -130,10 +130,11 @@ public:
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 
+		void *err;
 		TRes res;
-		auto caller = [=, &res](void *ptr, void *f) -> void {
-			typedef TRes(*TFn)(void *, TArgs...);
-			res = ((TFn)f)(ptr, args...);
+		auto caller = [=, &err, &res](void *ptr, void *f) -> void {
+			typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
+			res = ((TFn)f)(ptr, &err, args...);
 		};
 		static const FunctorVt<void(void *, void *)> vt(caller);
 		typedef FunctorVt<void(void *, void *)>::TInvoke TInvoke;
