@@ -114,42 +114,46 @@ void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFu
 
 errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
 {
+	static_assert((sizeof(SEV_ConcurrentFunctorQueue) % 32) == 0);
+
 	static_assert(SEV_BLOCK_PREAMBLE_SIZE == SEV_FUNCTOR_ALIGN); // Just for testing, it should be exactly this now. It can be any multiple
 	me->AtomicWriteSwap = { 0, 0 };
 	me->DeleteLock = { 0, 0 };
-	// me->PreLockShared = 0;
-#ifdef SEV_DEBUG_CFQ_PUSH
-	// me->VerifyAllocLock = 0;
-#endif
 	me->BlockSize = blockSize;
 	me->ReadBlock = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN);
 	if (!me->ReadBlock)
 	{
 		me->WriteBlock = null;
-		me->SpareBlock = null;
+		me->SpareBlockA = null;
+		me->SpareBlockB = null;
 		return ENOMEM;
 	}
 	me->WriteBlock = me->ReadBlock;
-	me->SpareBlock = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write (no need to check null)
+	me->SpareBlockB = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write (no need to check null)
+	me->SpareBlockA = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN);
 	me->PreWriteIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 	sev::wipeBlock(me->WriteBlock, blockSize);
-	if (me->SpareBlock)
-		sev::wipeBlock(me->SpareBlock, blockSize);
+	if (me->SpareBlockB)
+		sev::wipeBlock(me->SpareBlockB, blockSize);
+	if (me->SpareBlockA)
+		sev::wipeBlock(me->SpareBlockA, blockSize);
 	return 0;
 }
 
 void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 {
-	// Do not release while threads are still accessing this object!
-	// SEV_ASSERT(!me->PreLockShared);
-#ifdef SEV_DEBUG_CFQ_PUSH
-	// SEV_ASSERT(!me->VerifyAllocLock);
+	SEV_ASSERT(!SEV_AtomicSharedMutex_isLocked(&me->AtomicWriteSwap)); // TODO: Don't allow shared locks either...
+
+	SEV_alignedFree(me->SpareBlockA);
+#ifdef SEV_DEBUG
+	me->SpareBlockA = null;
 #endif
 
-	SEV_alignedFree(me->SpareBlock);
+	SEV_alignedFree(me->SpareBlockB);
 #ifdef SEV_DEBUG
-	me->SpareBlock = null;
+	me->SpareBlockB = null;
 #endif
+
 	// ptrdiff_t idx = me->ReadIdx;
 	uint8_t *block = (uint8_t *)me->ReadBlock;
 	const ptrdiff_t blockSize = me->BlockSize;
@@ -221,12 +225,6 @@ std::unique_ptr<std::shared_mutex> m(std::make_unique<std::shared_mutex>());
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
 {
-	union BlockData
-	{
-		void *ptr;
-		uint8_t *data;
-		sev::BlockPreamble *preamble;
-	};
 
 	// This function only locks while flipping to the next buffer
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
@@ -234,6 +232,35 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	const ptrdiff_t blockSize = me->BlockSize;
 	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockSize)
 		return ENOMEM;
+
+	// Allocate a spare when done, allows us to malloc outside of the lock
+	bool outOfSpare = false;
+	auto fin2 = gsl::finally([me, blockSize, &outOfSpare]() -> void {
+		if (!outOfSpare)
+			return;
+		if (SEV_AtomicPtr_load(&me->SpareBlockB))
+			return; // No need, already have a spare again
+		void *block = SEV_alignedMAlloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+		if (!block) return; // Failed to allocate, no problem here
+		sev::wipeBlock(block, blockSize);
+		// Put it in spare B first, in spare A if B is already full
+		uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockB, block, null);
+		if (spareBlock)
+		{
+			spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, block, null);
+			if (spareBlock) // Blocks were returned already, no need anymore!
+				SEV_alignedFree((void *)block);
+		}
+	});
+
+	union BlockData
+	{
+		void *ptr;
+		uint8_t *data;
+		sev::BlockPreamble *preamble;
+	};
+
+	// Get current write index
 	SEV_AtomicSharedMutex_lockShared(&me->AtomicWriteSwap);
 	auto fsh = gsl::finally([&]() {
 		SEV_AtomicSharedMutex_unlockShared(&me->AtomicWriteSwap);
@@ -281,25 +308,35 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 				}
 #endif
 
-				// First obtain a memory allocation
+				// Calculate next index on block boundary
 				debugProcessedWriteSwap = true;
-				BlockData allocBlock = { SEV_AtomicPtr_exchange(&me->SpareBlock, null) }; // Get spare and switch to null
 				static const ptrdiff_t allocIdxMasked = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
 				ptrdiff_t allocIdx = ((idx + blockSize - 1) & ~(blockSize - 1)) + allocIdxMasked; // Round up block size and add new starting index
 				ptrdiff_t allocNextIdx = allocIdx + sz;
 				SEV_ASSERT((allocNextIdx & (blockSize - 1)) > allocIdxMasked);
+
+				// Obtain a memory allocation
+				BlockData allocBlock = { SEV_AtomicPtr_exchange(&me->SpareBlockA, null) }; // Get spare and switch to null
 				if (!allocBlock.ptr)
 				{
-					allocBlock.ptr = SEV_alignedMAlloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+					allocBlock.ptr = SEV_AtomicPtr_exchange(&me->SpareBlockB, null); // Read B after A
 					if (!allocBlock.ptr)
 					{
-						errno_t res = errno;
-						SEV_ASSERT(res);
-						SEV_AtomicSharedMutex_downgradeLock(&me->AtomicWriteSwap);
-						if (res) return res;
-						return ENOMEM;
+						allocBlock.ptr = SEV_alignedMAlloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+						if (!allocBlock.ptr)
+						{
+							errno_t res = errno;
+							SEV_ASSERT(res);
+							SEV_AtomicSharedMutex_downgradeLock(&me->AtomicWriteSwap);
+							if (res) return res;
+							return ENOMEM;
+						}
+						sev::wipeBlock(allocBlock.ptr, blockSize);
 					}
-					sev::wipeBlock(allocBlock.ptr, blockSize);
+					else
+					{
+						outOfSpare = true; // Allocate a spare later while not under lock
+					}
 				}
 				SEV_ASSERT(!allocBlock.preamble->NextBlock);
 				SEV_ASSERT(allocBlock.preamble->ReadIdx == allocIdxMasked);
@@ -373,7 +410,6 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 			locked = true;
 		}
 	} while (!locked);
-
 
 #ifdef SEV_DEBUG_NB_OBJECTS
 	SEV_AtomicInt32_increment(&block.preamble->NbObjects);
@@ -473,9 +509,13 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 				// Attempt to release or spare the old block
 				// sev::wipeBlockOnly(readBlock); // , blockSize);
 				sev::wipeBlock(readBlock, blockSize);
-				uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlock, readBlock, null);
-				if (spareBlock) // Old value was not 0, not using this as a spare block
-					SEV_alignedFree((void *)readBlock);
+				uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockB, readBlock, null);
+				if (spareBlock)
+				{
+					spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, readBlock, null);
+					if (spareBlock) // Old value was not 0, not using this as a spare block
+						SEV_alignedFree((void *)readBlock);
+				}
 			}
 		}
 	});
@@ -537,9 +577,13 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 					// Attempt to release or spare the old block
 					// sev::wipeBlockOnly(oldReadBlock); // , blockSize);
 					sev::wipeBlock(oldReadBlock, blockSize);
-					uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlock, oldReadBlock, null);
-					if (spareBlock) // Old value was not 0, not using this as a spare block
-						SEV_alignedFree(oldReadBlock);
+					uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockB, oldReadBlock, null);
+					if (spareBlock)
+					{
+						spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, oldReadBlock, null);
+						if (spareBlock) // Old value was not 0, not using this as a spare block
+							SEV_alignedFree((void *)oldReadBlock);
+					}
 				}
 
 				continue; // Go back and see if there's anything to read
