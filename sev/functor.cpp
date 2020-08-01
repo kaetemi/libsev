@@ -29,15 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "functor.h"
 
-void SEV_throwBadAlloc()
-{
-	SEV_DEBUG_BREAK(); // Do not call this function
-}
-
-void SEV_throwBadFunctionCall()
-{
-	SEV_DEBUG_BREAK(); // Do not call this function
-}
+#undef SEV_BadAlloc
+#undef SEV_BadFunctionCall
+ptrdiff_t SEV_BadAlloc;
+ptrdiff_t SEV_BadFunctionCall;
 
 void *SEV_alignedMAlloc(ptrdiff_t size, size_t alignment)
 {

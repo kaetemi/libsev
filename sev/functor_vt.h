@@ -50,13 +50,15 @@ struct SEV_FunctorVt
 	void *Invoke;
 
 	void *Rethrower; // If this matches your local rethrower, the exception can be rethrown!
-	void *InvokeCatch; // Invoke with catch, returns error in argument (or returns the address of SEV_throwBadAlloc in case of memory trouble, or SEV_throwBadFunctionCall)
+	void *InvokeCatch; // Invoke with catch, returns error in argument (or returns the address of SEV_BadAlloc in case of memory trouble, or SEV_BadFunctionCall)
 	void(*DestroyException)(void *err);
 
 };
 
-SEV_LIB void SEV_throwBadAlloc(); // Not actually called. Used as a placeholder address in case InvokeCatch fails
-SEV_LIB void SEV_throwBadFunctionCall(); // Not actually called. Used as a placeholder address in case InvokeCatch fails
+SEV_LIB extern ptrdiff_t SEV_BadAlloc;
+SEV_LIB extern ptrdiff_t SEV_BadFunctionCall;
+#define SEV_BadAlloc (&SEV_BadAlloc)
+#define SEV_BadFunctionCall (&SEV_BadFunctionCall)
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -94,7 +96,7 @@ public:
 		, /*Destroy*/([](void *) -> void {})
 		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); }))
 		, /*Rethrower*/impl::rethrower()
-		, /*InvokeCatch*/((TInvokeCatch)([](void *, void **err, TArgs...) -> TRes { *err = SEV_throwBadFunctionCall; return TRes(); }))
+		, /*InvokeCatch*/((TInvokeCatch)([](void *, void **err, TArgs...) -> TRes { *err = SEV_BadFunctionCall; return TRes(); }))
 		, /*DestroyException*/([](void *) -> void {}) }
 	{
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
@@ -145,13 +147,13 @@ public:
 			{
 				std::exception_ptr ex = std::current_exception();
 				*err = new (nothrow) std::exception_ptr(ex);
-				if (!*err) *err = SEV_throwBadAlloc;
+				if (!*err) *err = SEV_BadAlloc;
 			}
 			return TRes();
 		})),
 		([](void *err) -> void {
-			SEV_ASSERT(err != SEV_throwBadFunctionCall);
-			if (err != SEV_throwBadAlloc)
+			SEV_ASSERT(err != SEV_BadFunctionCall);
+			if (err != SEV_BadAlloc)
 				delete err;
 		})
 	}
@@ -213,8 +215,8 @@ public:
 	inline void rethrow(void *err) const
 	{
 		if (!err) return;
-		if (err == SEV_throwBadAlloc) throw std::bad_alloc();
-		if (err == SEV_throwBadFunctionCall) throw std::bad_function_call();
+		if (err == SEV_BadAlloc) throw std::bad_alloc();
+		if (err == SEV_BadFunctionCall) throw std::bad_function_call();
 		auto fin = gsl::finally([this, err]() { m.DestroyException(err); });
 		if (m.Rethrower != impl::rethrower()) throw std::bad_exception(); // Exception comes from elsewhere!
 		std::rethrow_exception(*(std::exception_ptr *)err);
