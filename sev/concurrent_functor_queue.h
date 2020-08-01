@@ -73,10 +73,10 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueu
 SEV_LIB errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, ptrdiff_t size, void *ptr, void(*forwardConstructor)(void *ptr, void *other)); // Throws only if forwardConstructor throws
 #endif
 
-SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args); // Returns ENODATA if nothing to pop, EOTHER if function threw an exception, 0 if OK
-SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args);
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args); // Returns ENODATA if nothing to pop, EOTHER if function threw an exception; ENOMEM, 0 if OK
+// SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, errno_t(*caller)(void *args, void *ptr,const SEV_FunctorVt *vt), void *args); // res = f(ptr, args...)
 #ifdef __cplusplus
-SEV_LIB bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt **vt, void(*caller)(void *args, void *ptr, void *f), void *args); // Throws when function throws and exception
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, errno_t(*caller)(void *args, void *ptr, const SEV_FunctorVt *vt), void *args); // (res = vt->Invoke(ptr, err, args...)) err is exception, it must be freed if not a SEV_throw* reference
 #endif
 
 #ifdef __cplusplus
@@ -131,17 +131,23 @@ public:
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		void *err;
 		TRes res;
-		auto caller = [=, &err, &res](void *ptr, void *f) -> void {
-			typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
-			res = ((TFn)f)(ptr, &err, args...);
+		const SEV_FunctorVt *rvt = null;
+		auto invokeData = [=, &err, &res, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
+			typedef FunctorVt<TRes(TArgs...)>::TInvokeCatch TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
+			rvt = vt;
+			res = ((TFn)vt->InvokeCatch)(ptr, &err, args...);
+			return err ? EOTHER : 0;
 		};
-		static const FunctorVt<void(void *, void *)> vt(caller);
-		typedef FunctorVt<void(void *, void *)>::TInvoke TInvoke;
-		static const TInvoke inv = (TInvoke)vt.raw()->Invoke;
-		const SEV_FunctorVt *resvt;
-		success = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, &resvt, inv, (void *)(&caller));
-		SEV_ASSERT(resvt);
-		((const FunctorVt<void()> *)resvt)->rethrow(err); // Rethrow any exception
+		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
+		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
+		static const TInvoke invokeCall = (TInvoke)wrapvt.raw()->Invoke;
+		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
+		success = rvt;
+		if (rvt)
+		{
+			((const FunctorVt<void()> *)rvt)->rethrow(err); // Rethrow any exception
+			if (ec) throw std::bad_exception();
+		}
 		return res;
 	}
 	

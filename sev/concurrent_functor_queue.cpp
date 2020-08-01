@@ -403,25 +403,33 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 
 errno_t SEV_ConcurrentFunctorQueue_tryCallAndPop(SEV_ConcurrentFunctorQueue *me, void *args)
 {
-	typedef void(*TFn)(void *ptr, void *args);
-	return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(me, [](void *args, void *ptr, void *f) -> void {
-		((TFn)f)(ptr, args);
+	/*
+	void *err;
+	const SEV_FunctorVt *vt;
+	typedef void(*TFn)(void *ptr, void **err, void *args);
+	bool res = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(me, &vt, [](void *args, void *ptr, void *f) -> errno_t {
+		((TFn)f)(ptr, &err, args);
+		if (
 	}, args);
+	*/
+	return 0;
 }
 
+/*
 errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctor(SEV_ConcurrentFunctorQueue *me, void(*caller)(void *args, void *ptr, void *f), void *args)
 {
-	try
+	/ *try
 	{
 		return SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(me, null, caller, args) ? 0 : ENODATA;
 	}
 	catch (...)
 	{
 		return EOTHER;
-	}
+	}* /
 }
+*/
 
-bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt **vt, void(*caller)(void *args, void *ptr, void *f), void *args)
+SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueue *me, errno_t(*caller)(void *args, void *ptr, const SEV_FunctorVt *vt), void *args)
 {
 	// std::unique_lock<std::shared_mutex> l(*m);
 
@@ -537,7 +545,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 				continue; // Go back and see if there's anything to read
 			}
 			// Queue is empty
-			return false;
+			return ENODATA;
 		}
 		else
 		{
@@ -572,16 +580,7 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 	// Call
 	SEV_ASSERT(SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
 	SEV_ASSERT(SEV_AtomicPtrDiff_load(&functorPreamble->Ready));
-	if (vt)
-	{
-		*vt = functorPreamble->Vt;
-		caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->InvokeCatch);
-	}
-	else
-	{
-		caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt->Invoke);
-	}
-	return true;
+	return caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt);
 }
 
 /* end of file */
