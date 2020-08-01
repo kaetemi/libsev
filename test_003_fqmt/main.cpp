@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <atomic>
 #include <functional>
 #include <queue>
+#include <sstream>
 #include <concurrent_queue.h>
 #include <sev/functor_vt.h>
 #include <sev/functor_view.h>
@@ -76,29 +77,25 @@ std::string s_S = "This is really a very long string that definitely won't fit i
 std::string s_T = "This is really a very long string that also won't fit inside the builtin storage"s;
 std::string s_Y = "!"s;
 
-#define DEF_ALL 1
+#define DEF_ALL 0
 
 int main()
 {
 #define DO_POPS
 	const int loop = 16;
 	int lc = 0;
-	const int rounds = (1024 * 1024) * 8 * 4;
+	const int rounds = (1024 * 1024) * 8;
 	const int tc = 8;
-	PERFORMACE_INFORMATION pi;
-Again:
+	PROCESS_MEMORY_COUNTERS pmc;
+	bool hederok = false;
+	std::stringstream hdr;
+	std::stringstream csv;
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-	{
-		ptrdiff_t z = s_AllocationCount;
-		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
-	}
 	std::chrono::time_point t0 = std::chrono::steady_clock::now();
 	int64_t ms;
 	auto delta = [&]() -> int64_t {
@@ -107,6 +104,13 @@ Again:
 		t0 = t1;
 		return res;
 	};
+Again:
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+	}
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
@@ -126,8 +130,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "queue 1t 2s: ms, queue 1t 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -146,6 +152,8 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (!hederok) hdr << "queue 1t 2s: pop ms, ";
+		csv << ms << ", ";
 #endif
 		delta();
 	}
@@ -178,9 +186,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
-		// Check committed memory consumption!!
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "concurrency 1t 2s: ms, concurrency 1t 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -198,6 +207,8 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (!hederok) hdr << "concurrency 1t 2s: pop ms, ";
+		csv << ms << ", ";
 #endif
 		delta();
 	}
@@ -230,8 +241,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "sev 1t 2s: ms, sev 1t 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -251,6 +264,8 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (!hederok) hdr << "sev 1t 2s: pop ms, ";
+		csv << ms << ", ";
 #endif
 		delta();
 	}
@@ -262,8 +277,8 @@ Again:
 	{
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << std::endl << std::endl;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
 	}
 #endif
 	//////////////////////////////////////////////////////////////////////
@@ -285,8 +300,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "concurrency 1t 0: ms, concurrency 1t 0: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -315,8 +332,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "sev 1t 0: ms, sev 1t 0: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -335,7 +354,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if DEF_ALL
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) "sv << tc << " threaded with "sv << rounds << " entries each and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -361,8 +380,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "concurrency mt 2s: ms, concurrency mt 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 #ifdef DO_POPS
 		std::cout << "Test pop()"sv << std::endl;
 		delta();
@@ -393,6 +414,8 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (!hederok) hdr << "concurrency mt 2s: pop ms, ";
+		csv << ms << ", ";
 #endif
 		delta();
 	}
@@ -409,7 +432,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1 ///////////
+#if DEF_ALL ///////////
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -435,8 +458,10 @@ Again:
 		ms = delta();
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "sev mt 2s: ms, sev mt 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 #ifdef DO_POPS
 #if 1
 		std::cout << "Test pop()"sv << std::endl;
@@ -472,6 +497,8 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << std::endl;
+		if (!hederok) hdr << "sev mt 2s: pop ms, ";
+		csv << ms << ", ";
 #else
 		std::cout << "Test pop() single threaded"sv << std::endl;
 		delta();
@@ -511,7 +538,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if DEF_ALL
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -574,8 +601,10 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "concurrency mt all 2s: ms, concurrency mt all 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -591,7 +620,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if DEF_ALL
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -663,8 +692,10 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "sev mt all 2s: ms, sev mt all 2s: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -683,7 +714,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if DEF_ALL
 	{
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
@@ -743,8 +774,10 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "concurrency mt all 0: ms, concurrency mt all 0: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -836,8 +869,10 @@ Again:
 		std::cout << "Check: "sv << ref << " = "sv << res << " ("sv << i << " / "sv << i2 << " / "sv << rounds << ")"sv << std::endl;
 		std::cout << "Total: "sv << ms << "ms"sv << std::endl;
 		std::cout << "Local allocation count: "sv << s_AllocationCount << "\n"sv;
-		if (GetPerformanceInfo(&pi, sizeof(pi)))
-			std::cout << "Memory: "sv << pi.CommitTotal << " bytes"sv << std::endl;
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+			std::cout << "Memory: "sv << pmc.WorkingSetSize << " bytes"sv << std::endl;
+		if (!hederok) hdr << "sev mt all 0: ms, sev mt all 0: bytes, ";
+		csv << ms << ", " << pmc.WorkingSetSize << ", ";
 		delta();
 	}
 	{
@@ -856,6 +891,13 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
+	if (!hederok)
+	{
+		hederok = true;
+		hdr << std::endl;
+	}
+	csv << std::endl;
+	std::cout << hdr.str() << csv.str();
 	++lc;
 	if (lc < loop)
 		goto Again;
