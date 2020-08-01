@@ -536,7 +536,6 @@ bool SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_ConcurrentFunctorQueu
 
 				continue; // Go back and see if there's anything to read
 			}
-
 			// Queue is empty
 			return false;
 		}
