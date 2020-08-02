@@ -70,7 +70,7 @@ The specified quick mode policy was not found.
 Allocation count: 0
 */
 
-#include <sev/win32_exception.h>
+// #include <sev/win32_exception.h>
 #include <sev/event_flag.h>
 #include <iostream>
 #include <thread>
@@ -112,7 +112,7 @@ int main()
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
-
+#if 0
 	{
 		std::cout << sev::Win32Exception(0, 0, __FILE__, __LINE__).what() << "\n";
 		std::cout << sev::Win32Exception(0, ERROR_PATH_NOT_FOUND, __FILE__, __LINE__).what() << "\n";
@@ -128,7 +128,7 @@ int main()
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
-
+#endif
 	{
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
@@ -204,20 +204,26 @@ int main()
 				});
 
 			std::thread u([&]() -> void {
+#if 1
+				b.wait();
+				std::cout << "3\n"sv;
+				c.set();
+				std::cout << "4\n"; // Not testing crash anymore
+#else
 				try
 				{
 					b.wait();
 					std::cout << "3\n"sv;
 					c.set();
-					// b.wait(); // TEST
-					// std::cout << "SHOULD NOT HAPPEN\n"sv;
-					std::cout << "4\n"; // Not testing crash anymore
+					b.wait(); // TEST
+					std::cout << "SHOULD NOT HAPPEN\n"sv;
 				}
 				catch (sev::Exception &ex)
 				{
 					std::cout << "4 (Exception OK)\n"sv;
 					std::cout << ex.what() << "\n"sv;
 				}
+#endif
 				d.set();
 				});
 
@@ -243,7 +249,7 @@ int main()
 	{
 		std::cout << "Y\n"sv;
 	}
-
+#if 0
 	{
 		sev::Exception a("Hello world");
 		sev::Exception b(a);
@@ -251,12 +257,13 @@ int main()
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
-
+#endif
 	{
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
 
+#if 0
 	{
 		sev::Exception a("Hello world", 1);
 		sev::Exception b(a);
@@ -264,12 +271,14 @@ int main()
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
+#endif
 
 	{
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work
 		std::cout << "Allocation count: "sv << z << "\n"sv;
 	}
 
+#if 0
 	{
 		std::cout << sev::Win32Exception::systemMessage(E_ACCESSDENIED);
 		std::cout << sev::Win32Exception::systemMessage(S_OK);
@@ -278,6 +287,7 @@ int main()
 		std::cout << sev::Win32Exception::systemMessage(S_OK, ERROR_DS_ATTRIBUTE_TYPE_UNDEFINED);
 		std::cout << sev::Win32Exception::systemMessage(S_OK, ERROR_IPSEC_QM_POLICY_NOT_FOUND);
 	}
+#endif
 
 	{
 		ptrdiff_t z = s_AllocationCount; // Needs static link to work

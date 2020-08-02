@@ -31,6 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace sev {
 
+#if 0
+
 namespace {
 
 thread_local IEventLoop *l_EventLoop;
@@ -70,7 +72,7 @@ void EventLoop::loop()
 		for (;;)
 		{
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			EventFunction f;
+			EventFunctor f;
 			if (!m_ImmediateConcurrent.try_pop(f))
 				break;
 #else
@@ -80,11 +82,11 @@ void EventLoop::loop()
 				m_QueueLock.unlock();
 				break;
 			}
-			EventFunction f = m_Immediate.front();
+			EventFunctor f = m_Immediate.front();
 			m_Immediate.pop();
 			m_QueueLock.unlock();
 #endif
-			f();
+			f(*this);
 		}
 
 		bool poked = false;
@@ -123,7 +125,7 @@ void EventLoop::loop()
 			m_QueueTimeoutLock.unlock();
 #endif
 			m_Cancel = false;
-			tf.f(); // call
+			tf.f(*this); // call
 			if (!m_Cancel && (tf.interval > std::chrono::nanoseconds::zero())) // repeat
 			{
 				tf.time += tf.interval;
@@ -157,6 +159,8 @@ void test()
 }
 
 } /* anonymous namespace */
+
+#endif
 
 } /* namespace sev */
 

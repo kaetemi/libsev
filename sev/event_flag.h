@@ -55,10 +55,6 @@ TODO: Support eventfd
 #endif
 #endif
 
-#if defined(SEV_EVENT_FLAG_WIN32)
-#include "win32_exception.h"
-#endif
-
 #ifdef SEV_EVENT_FLAG_STL
 #ifdef __cplusplus
 namespace sev::impl {

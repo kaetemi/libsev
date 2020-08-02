@@ -32,7 +32,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_FUNCTOR_VIEW_H
 
 #include "platform.h"
-#include "exception.h"
 #include "functor.h"
 
 #ifdef __cplusplus
@@ -178,14 +177,14 @@ public:
 	}
 
 	inline FunctorView(const FunctorView &other) noexcept
-		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
+		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr), m_Movable(false)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;
 	}
 
 	inline FunctorView(FunctorView &other) noexcept
-		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr)
+		: m_Vt(other.m_Vt), m_Ptr(other.m_Ptr), m_Movable(false)
 	{
 		// When copying a movable, it's no longer movable
 		other.m_Movable = false;

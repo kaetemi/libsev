@@ -55,7 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 #include "event_flag.h"
-#include "event_function.h"
+#include "functor_view.h"
 
 /*
 
@@ -83,12 +83,15 @@ struct EventLoopOptions
 }
 */
 
-// typedef std::function<void()> EventFunction; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
+class SEV_LIB IEventLoop;
+
+typedef FunctorView<void(IEventLoop &el)> EventFunctorView; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
+typedef Functor<void(IEventLoop &el)> EventFunctor; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
 // typedef std::function<void(ptrdiff_t)> EventKernel;
 
-// Or... typedef std::function<void(IEventLoop &el)> EventFunction; ?
+// Or... typedef std::function<void(IEventLoop &el)> EventFunctorView; ?
 
-class SEV_LIB IEventLoop;
+#if 0
 
 class SEV_LIB IEventLoop
 {
@@ -105,23 +108,23 @@ public:
 	virtual void join(bool empty = false) = 0; // thread-safe
 
 	//! Post a function, return immediately
-	virtual void post(const EventFunction &f) = 0;
-	virtual void post(EventFunction &&f) = 0;
+	virtual void post(const EventFunctorView &f) = 0;
+	virtual void post(EventFunctorView &&f) = 0;
 
 	/*
 	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to) = 0;
 	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to) = 0;
 
-	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, const EventFunction &cb) = 0;
-	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, EventFunction &&cb) = 0;
+	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, const EventFunctorView &cb) = 0;
+	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, EventFunctorView &&cb) = 0;
 
-	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, EventFunction &&cb) = 0;
-	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, const EventFunction &cb) = 0;
+	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, EventFunctorView &&cb) = 0;
+	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, const EventFunctorView &cb) = 0;
 	*/
 
 	//! Post a function, block until processed
-	virtual void invoke(const EventFunction &f) = 0;
-	virtual void invoke(EventFunction &&f) = 0;
+	virtual void invoke(const EventFunctorView &f) = 0;
+	virtual void invoke(EventFunctorView &&f) = 0;
 
 	/*
 	virtual void invoke(const EventKernel &f, ptrdiff_t from, ptrdiff_t to) = 0;
@@ -129,12 +132,12 @@ public:
 	*/
 
 	//! Post a function that will be called after a timeout (TODO: Return a handle to cancel?)
-	virtual void timeout(const EventFunction &f, int ms) = 0;
-	virtual void timeout(EventFunction &&f, int ms) = 0;
+	virtual void timeout(const EventFunctorView &f, int ms) = 0;
+	virtual void timeout(EventFunctorView &&f, int ms) = 0;
 
 	//! Post a function that will be called at an interval (TODO: Return a handle to cancel?)
-	virtual void interval(const EventFunction &f, int ms) = 0;
-	virtual void interval(EventFunction &&f, int ms) = 0;
+	virtual void interval(const EventFunctorView &f, int ms) = 0;
+	virtual void interval(EventFunctorView &&f, int ms) = 0;
 
 	void setCurrent(bool current = true);
 	bool current();
@@ -156,9 +159,9 @@ public:
 	{
 		struct TData
 		{
-			std::function<void(ptrdiff_t)> f;
-			EventFunction cb;
-			EventFunction ef;
+			Functor<void(ptrdiff_t)> f;
+			EventFunctorView cb;
+			EventFunctorView ef;
 			std::atomic_ptrdiff_t counter;
 			ptrdiff_t to;
 			int tc;
@@ -175,8 +178,8 @@ public:
 			for (int t = 0; t < tc; ++tc)
 			{
 				post([d]() -> void {
-					std::function<void(ptrdiff_t)> &const f = d->f;
-					EventFunction &const cb = d->cb;
+					Functor<void(ptrdiff_t)> &const f = d->f;
+					EventFunctorView &const cb = d->cb;
 					std::atomic_ptrdiff_t &const counter = d->counter;
 					const ptrdiff_t &const to = d->to;
 					const int &const tc = d->tc;
@@ -196,9 +199,9 @@ public:
 		else
 		{
 			d->ef = [d]() -> void {
-				std::function<void(ptrdiff_t)> &const f = d->f;
-				EventFunction &const cb = d->cb;
-				EventFunction &const ef = d->ef;
+				Functor<void(ptrdiff_t)> &const f = d->f;
+				EventFunctorView &const cb = d->cb;
+				EventFunctorView &const ef = d->ef;
 				std::atomic_ptrdiff_t &const counter = d->counter;
 				const ptrdiff_t &const to = d->to;
 				const int &const tc = d->tc;
@@ -272,6 +275,10 @@ public:
 	}
 };
 
+#endif
+
+#if 0
+
 class SEV_LIB EventLoop
 {
 public:
@@ -308,7 +315,7 @@ public:
 #else
 		std::unique_lock<AtomicMutex> lock(m_QueueLock);
 		std::unique_lock<AtomicMutex> tlock(m_QueueTimeoutLock);
-		m_Immediate = std::move(std::queue<EventFunction>());
+		m_Immediate = std::move(std::queue<EventFunctorView>());
 		m_Timeout = std::move(std::priority_queue<timeout_func>());
 #endif
 	}
@@ -323,9 +330,9 @@ public:
 	void join(bool empty = false) // thread-safe
 	{
 		EventFlag flag;
-		EventFunction syncFunc = [this, &flag, &syncFunc, empty]() -> void {
+		Functor<void(EventLoop &el)> syncFunc = [/*this,*/ &flag, &syncFunc, empty](EventLoop &el) -> void {
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			if (empty && !m_ImmediateConcurrent.empty())
+			if (empty && !el.m_ImmediateConcurrent.empty())
 #else
 			bool immediateEmpty;
 			; {
@@ -335,7 +342,7 @@ public:
 			if (empty && !immediateEmpty)
 #endif
 			{
-				immediate(syncFunc);
+				el.immediate(syncFunc);
 			}
 			else
 			{
@@ -361,34 +368,34 @@ private:
 	}
 
 public:
-	inline void immediate(const EventFunction &f) // thread-safe
+	inline void immediate(const EventFunctorView &f) // thread-safe
 	{
 		immediate_(f);
 	}
 
-	void immediate(EventFunction &&f) // thread-safe
+	void immediate(EventFunctorView &&f) // thread-safe
 	{
 		immediate_(f);
 	}
 	*/
 
-	template<typename T = EventFunction>
+	template<typename T = EventFunctorView>
 	inline void immediate(T &&f)
 	{
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-		m_ImmediateConcurrent.push(std::forward<EventFunction>(f));
+		m_ImmediateConcurrent.push(std::forward<EventFunctorView>(f));
 #else
 		std::unique_lock<AtomicMutex> lock(m_QueueLock);
-		m_Immediate.push(std::forward<EventFunction>(f));
+		m_Immediate.push(std::forward<EventFunctorView>(f));
 #endif
 		poke();
 	}
 
-	template<class rep, class period, typename T = EventFunction>
+	template<class rep, class period, typename T = EventFunctorView>
 	void timeout(T &&f, const std::chrono::duration<rep, period>& delta) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = std::forward<EventFunction>(f);
+		tf.f = std::forward<EventFunctorView>(f);
 		tf.time = std::chrono::steady_clock::now() + delta;
 		tf.interval = std::chrono::nanoseconds::zero();
 		; {
@@ -402,11 +409,11 @@ public:
 		poke();
 	}
 
-	template<class rep, class period, typename T = EventFunction> 
+	template<class rep, class period, typename T = EventFunctorView> 
 	void interval(T &&f, const std::chrono::duration<rep, period>& interval) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = std::forward<EventFunction>(f);
+		tf.f = std::forward<EventFunctorView>(f);
 		tf.time = std::chrono::steady_clock::now() + interval;
 		tf.interval = interval;
 		; {
@@ -420,11 +427,11 @@ public:
 		poke();
 	}
 
-	template<typename T = EventFunction>
+	template<typename T = EventFunctorView>
 	void timed(T &&f, const std::chrono::steady_clock::time_point &point) // thread-safe
 	{
 		timeout_func tf;
-		tf.f = std::forward<EventFunction>(f);
+		tf.f = std::forward<EventFunctorView>(f);
 		tf.time = point;
 		tf.interval = std::chrono::steady_clock::duration::zero();
 		; {
@@ -439,7 +446,7 @@ public:
 	}
 
 public:
-	template<typename T = EventFunction>
+	template<typename T = EventFunctorView>
 	void thread(T &&f, T &&callback)
 	{
 		std::thread t([this, f = std::forward(f), callback = std::forward(f)]() mutable -> void {
@@ -456,7 +463,7 @@ private:
 private:
 	struct timeout_func
 	{
-		EventFunction f;
+		EventFunctor f;
 		std::chrono::steady_clock::time_point time;
 		std::chrono::steady_clock::duration interval;
 
@@ -473,17 +480,19 @@ private:
 	EventFlag m_Flag;
 
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-	concurrency::concurrent_queue<EventFunction> m_ImmediateConcurrent;
+	concurrency::concurrent_queue<EventFunctor> m_ImmediateConcurrent;
 	concurrency::concurrent_priority_queue<timeout_func> m_TimeoutConcurrent;
 #else
 	AtomicMutex m_QueueLock;
-	std::queue<EventFunction> m_Immediate;
+	std::queue<EventFunctorView> m_Immediate;
 	AtomicMutex m_QueueTimeoutLock;
 	std::priority_queue<timeout_func> m_Timeout;
 #endif
 	bool m_Cancel;
 
 }; /* class EventLoop */
+
+#endif
 
 } /* namespace sev */
 
