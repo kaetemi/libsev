@@ -121,7 +121,7 @@ public:
 		}
 	}
 
-	SEV_FORCE_INLINE ~EventFlag()
+	SEV_FORCE_INLINE ~EventFlag() noexcept
 	{
 		SEV_EventFlag_release(&m);
 	}
@@ -132,22 +132,22 @@ public:
 	SEV_FORCE_INLINE EventFlag(EventFlag &&other) noexcept = delete;
 	SEV_FORCE_INLINE EventFlag &operator=(EventFlag &&other) noexcept = delete;
 
-	SEV_FORCE_INLINE void wait()
+	SEV_FORCE_INLINE void wait() noexcept
 	{
 		SEV_EventFlag_wait(&m);
 	}
 
-	SEV_FORCE_INLINE bool wait(int timeoutMs) // Returns false on timeout
+	SEV_FORCE_INLINE bool wait(int timeoutMs) noexcept // Returns false on timeout
 	{
 		return SEV_EventFlag_waitFor(&m, timeoutMs);
 	}
 
-	SEV_FORCE_INLINE void set()
+	SEV_FORCE_INLINE void set() noexcept
 	{
 		SEV_EventFlag_set(&m);
 	}
 
-	SEV_FORCE_INLINE void reset()
+	SEV_FORCE_INLINE void reset() noexcept
 	{
 		SEV_EventFlag_reset(&m);
 	}
