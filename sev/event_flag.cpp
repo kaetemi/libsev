@@ -36,6 +36,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "win32_exception.h" // TODO: exception.h
 #endif
 
+void SEV_terminate()
+{
+	std::terminate();
+}
+
 namespace sev {
 
 #ifdef SEV_EVENT_FLAG_STL

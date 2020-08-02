@@ -65,6 +65,16 @@ TODO: Support eventfd
 #endif
 
 #ifdef __cplusplus
+extern "C" {
+#endif
+
+SEV_LIB void SEV_terminate();
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
 
 namespace sev {
 
