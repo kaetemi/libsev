@@ -42,9 +42,10 @@ TODO: Support eventfd
 #define SEV_EVENT_FLAG_H
 
 #include "platform.h"
+#include "atomic.h"
 
-// #define SEV_EVENT_FLAG_MOVABLE
 // #define SEV_EVENT_FLAG_STL
+#define SEV_EVENT_FLAG_OPTIMIZE
 
 #if !defined(SEV_EVENT_FLAG_WIN32) && !defined(SEV_EVENT_FLAG_EVENTFD) && !defined(SEV_EVENT_FLAG_STL)
 #ifdef _WIN32
@@ -58,15 +59,44 @@ TODO: Support eventfd
 #include "win32_exception.h"
 #endif
 
-#if defined(SEV_EVENT_FLAG_WIN32) || defined(SEV_EVENT_FLAG_EVENTFD)
-#define SEV_EVENT_FLAG_INLINE inline
-#else
-#define SEV_EVENT_FLAG_INLINE
+#ifdef SEV_EVENT_FLAG_STL
+#ifdef __cplusplus
+namespace sev::impl {
+struct EventFlag;
+}
+#endif
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct SEV_EventFlag
+{
+#if defined(SEV_EVENT_FLAG_WIN32)
+	HANDLE Event;
+#elif defined(__cplusplus)
+	sev::impl::EventFlag *Impl;
+#else
+	void *Impl;
+#endif
+
+#if defined(SEV_EVENT_FLAG_OPTIMIZE)
+	SEV_AtomicInt32 Waiting;
+	SEV_AtomicInt32 Set;
+#else
+	int ReservedInt[2];
+#endif
+
+};
+
+SEV_LIB errno_t SEV_EventFlag_init(SEV_EventFlag *ef, bool manualReset, bool initialState);
+SEV_LIB void SEV_EventFlag_release(SEV_EventFlag *ef);
+
+SEV_LIB void SEV_EventFlag_wait(SEV_EventFlag *ef);
+SEV_LIB bool SEV_EventFlag_waitFor(SEV_EventFlag *ef, int timeoutMs);
+SEV_LIB void SEV_EventFlag_set(SEV_EventFlag *ef);
+SEV_LIB void SEV_EventFlag_reset(SEV_EventFlag *ef);
 
 SEV_LIB void SEV_terminate();
 
@@ -78,168 +108,58 @@ SEV_LIB void SEV_terminate();
 
 namespace sev {
 
-#ifdef SEV_EVENT_FLAG_STL
-struct EventFlagImpl;
-#endif
-
-struct SEV_LIB EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
+struct EventFlag /* NOTE: Use struct for objects which should generally be used by value, class for objects which should generally be used by pointer. */
 {
 public:
-	inline EventFlag(bool manualReset = false, bool initialState = false)
-#ifdef SEV_EVENT_FLAG_WIN32
-		: m_Event(CreateEventW(null, manualReset, manualReset, null))
-#else
-		: m_Impl(createImpl(manualReset, manualReset))
-#endif
+	SEV_FORCE_INLINE EventFlag(bool manualReset = false, bool initialState = false)
 	{
-		static_assert(sizeof(EventFlag) == sizeof(void *));
-#ifdef SEV_EVENT_FLAG_WIN32
-		static_assert(sizeof(EventFlag) == sizeof(HANDLE));
-		if (!m_Event)
-			SEV_THROW_LAST_ERROR();
-#else
-		static_assert(sizeof(EventFlag) == sizeof(EventFlagImpl *));
-#endif
-	}
-
-	inline ~EventFlag()
-	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		HANDLE hEvent = m_Event;
-#ifdef SEV_EVENT_FLAG_MOVABLE
-		if (hEvent != INVALID_HANDLE_VALUE)
-#endif
+		errno_t err = SEV_EventFlag_init(&m, manualReset, initialState);
+		if (err)
 		{
-#ifdef SEV_DEBUG
-			// Undefined behaviour, so try to crash if something's still waiting
-			m_Event = INVALID_HANDLE_VALUE;
-			SetEvent(hEvent);
-#endif
-			CloseHandle(hEvent);
+			if (err == ENOMEM) throw std::bad_alloc();
+			else throw std::exception();
 		}
-#else
-		destroyImpl(m_Impl);
-#endif
 	}
 
-	inline EventFlag(const EventFlag &other) = delete;
-	inline EventFlag &operator=(const EventFlag &other) = delete;
-
-#ifdef SEV_EVENT_FLAG_MOVABLE
-	inline EventFlag(EventFlag &&other) noexcept
+	SEV_FORCE_INLINE ~EventFlag()
 	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		m_Event = other.m_Event;
-		other.m_Event = INVALID_HANDLE_VALUE;
-#else
-		m_Impl = other.m_Impl;
-		other.m_Impl = null;
-#endif
+		SEV_EventFlag_release(&m);
 	}
 
-	inline EventFlag &operator=(EventFlag &&other) noexcept
-	{
-		if (this != &other)
-		{
-			this->~EventFlag();
-			new (this) EventFlag(move(other));
-		}
-		return *this;
-	}
-#endif
+	SEV_FORCE_INLINE EventFlag(const EventFlag &other) = delete;
+	SEV_FORCE_INLINE EventFlag &operator=(const EventFlag &other) = delete;
 
-	SEV_EVENT_FLAG_INLINE void wait()
+	SEV_FORCE_INLINE EventFlag(EventFlag &&other) noexcept = delete;
+	SEV_FORCE_INLINE EventFlag &operator=(EventFlag &&other) noexcept = delete;
+
+	SEV_FORCE_INLINE void wait()
 	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		HANDLE hEvent = m_Event;
-		DWORD res = WaitForSingleObject(hEvent, INFINITE);
-		if (res != WAIT_OBJECT_0)
-			SEV_THROW_LAST_ERROR();
-#ifdef SEV_DEBUG
-		if (m_Event != hEvent) // This will cause either a memory access violation or throw the following exception
-			throw Exception("sev::EventFlag deleted while waiting"sv, 1); // Thread that wasn't awakened should crash and unwind
-#endif
-#else
-		waitImpl(m_Impl);
-#endif
+		SEV_EventFlag_wait(&m);
 	}
 
-	SEV_EVENT_FLAG_INLINE bool wait(int timeoutMs) // Returns false on timeout
+	SEV_FORCE_INLINE bool wait(int timeoutMs) // Returns false on timeout
 	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		HANDLE hEvent = m_Event;
-		DWORD res = WaitForSingleObject(hEvent, timeoutMs);
-		if (res == WAIT_TIMEOUT)
-			return false;
-		if (res != WAIT_OBJECT_0)
-			SEV_THROW_LAST_ERROR();
-#ifdef SEV_DEBUG
-		if (m_Event != hEvent) // This will cause either a memory access violation or throw the following exception
-			throw Exception("sev::EventFlag deleted while waiting"sv, 1); // Thread that wasn't awakened should crash and unwind
-#endif
-		return true;
-#else
-		return waitImpl(m_Impl, timeoutMs);
-#endif
+		return SEV_EventFlag_waitFor(&m, timeoutMs);
 	}
 
-	SEV_EVENT_FLAG_INLINE void set()
+	SEV_FORCE_INLINE void set()
 	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		if (!SetEvent(m_Event))
-			SEV_THROW_LAST_ERROR();
-#else
-		setImpl(m_Impl);
-#endif
+		SEV_EventFlag_set(&m);
 	}
 
-	SEV_EVENT_FLAG_INLINE void reset()
+	SEV_FORCE_INLINE void reset()
 	{
-#ifdef SEV_EVENT_FLAG_WIN32
-		if (!ResetEvent(m_Event))
-			SEV_THROW_LAST_ERROR();
-#else
-		resetImpl(m_Impl);
-#endif
+		SEV_EventFlag_reset(&m);
 	}
 
 private:
-#ifdef SEV_EVENT_FLAG_WIN32
-	HANDLE m_Event;
-#else
-	EventFlagImpl *m_Impl;
-
-	static EventFlagImpl *createImpl(bool manualReset, bool initialState);
-	static void destroyImpl(EventFlagImpl *m);
-
-	static void waitImpl(EventFlagImpl *m);
-	static bool waitImpl(EventFlagImpl *m, int timeoutMs);
-	static void setImpl(EventFlagImpl *m);
-	static void resetImpl(EventFlagImpl *m);
-#endif
-
+	SEV_EventFlag m;
+	
 };
 
 }
 
-#ifdef SEV_EVENT_FLAG_WIN32
-typedef HANDLE SEV_EventFlag;
-#else
-typedef sev::EventFlagImpl *SEV_EventFlag;
-#endif
-
-#else
-
-typedef void *SEV_EventFlag;
-
-#endif
-
-SEV_EventFlag SEV_EventFlag_create();
-void SEV_EventFlag_destroy(SEV_EventFlag eventFlag);
-
-bool SEV_EventFlag_wait(SEV_EventFlag eventFlag);
-bool SEV_EventFlag_set(SEV_EventFlag eventFlag);
-bool SEV_EventFlag_reset(SEV_EventFlag eventFlag);
+#endif /* #ifdef __cplusplus */
 
 #endif /* #ifndef SEV_EVENT_FLAG_H */
 

@@ -63,6 +63,9 @@ struct SEV_ConcurrentFunctorQueue
 	SEV_AtomicSharedMutex DeleteLock; // 4* int
 
 	int32_t ReservedInt[4]; // Fix structure size to multiples of 32 for ABI stability
+	// TODO: Add some malloc/free counters for perf
+	// SEV_AtomicInt32 PerfMAllocCounter;
+	// SEV_AtomicInt32 PerfFreeCounter;
 
 };
 

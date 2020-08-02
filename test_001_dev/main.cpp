@@ -209,8 +209,9 @@ int main()
 					b.wait();
 					std::cout << "3\n"sv;
 					c.set();
-					b.wait(); // TEST
-					std::cout << "SHOULD NOT HAPPEN\n"sv;
+					// b.wait(); // TEST
+					// std::cout << "SHOULD NOT HAPPEN\n"sv;
+					std::cout << "4\n"; // Not testing crash anymore
 				}
 				catch (sev::Exception &ex)
 				{

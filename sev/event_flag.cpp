@@ -32,21 +32,110 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <atomic>
 #include <condition_variable>
 
-#ifdef SEV_EVENT_FLAG_STL
-#include "win32_exception.h" // TODO: exception.h
-#endif
-
 void SEV_terminate()
 {
 	SEV_DEBUG_BREAK();
 	std::terminate();
 }
 
-namespace sev {
+#if defined(SEV_EVENT_FLAG_WIN32)
 
-#ifdef SEV_EVENT_FLAG_STL
+errno_t SEV_EventFlag_init(SEV_EventFlag *ef, bool manualReset, bool initialState)
+{
+	SEV_AtomicInt32_store(&ef->Set, 0);
+	SEV_AtomicInt32_store(&ef->Waiting, 0);
+	ef->Event = CreateEventW(null, manualReset, manualReset, null);
+	if (!ef->Event) return ENOMEM;
+	return 0;
+}
 
-struct EventFlagImpl
+void SEV_EventFlag_release(SEV_EventFlag *ef)
+{
+	HANDLE hEvent = ef->Event;
+	if (ef->Waiting)
+		SEV_terminate();
+#ifdef SEV_EVENT_FLAG_MOVABLE
+	if (hEvent != INVALID_HANDLE_VALUE)
+#endif
+	{
+		CloseHandle(hEvent);
+	}
+
+}
+
+void SEV_EventFlag_wait(SEV_EventFlag *ef)
+{
+	HANDLE hEvent = ef->Event;
+#ifdef SEV_EVENT_FLAG_OPTIMIZE
+	SEV_AtomicInt32_increment(&ef->Waiting);
+	if (SEV_AtomicInt32_exchange(&ef->Set, 0))
+	{
+		SEV_AtomicInt32_decrement(&ef->Waiting);
+		return;
+	}
+#endif
+	DWORD res = WaitForSingleObject(hEvent, INFINITE);
+#ifdef SEV_EVENT_FLAG_OPTIMIZE
+	SEV_AtomicInt32_decrement(&ef->Waiting);
+#endif
+	if (res != WAIT_OBJECT_0)
+		SEV_terminate();
+
+}
+
+bool SEV_EventFlag_waitFor(SEV_EventFlag *ef, int timeoutMs)
+{
+	HANDLE hEvent = ef->Event;
+#ifdef SEV_EVENT_FLAG_OPTIMIZE
+	SEV_AtomicInt32_increment(&ef->Waiting);
+	if (SEV_AtomicInt32_exchange(&ef->Set, 0))
+	{
+		SEV_AtomicInt32_decrement(&ef->Waiting);
+		return true;
+	}
+#endif
+	DWORD res = WaitForSingleObject(hEvent, timeoutMs);
+#ifdef SEV_EVENT_FLAG_OPTIMIZE
+	SEV_AtomicInt32_decrement(&ef->Waiting);
+#endif
+	if (res == WAIT_TIMEOUT)
+		return false;
+	if (res != WAIT_OBJECT_0)
+		SEV_terminate();
+	return true;
+
+}
+
+void SEV_EventFlag_set(SEV_EventFlag *ef)
+{
+	if (SEV_AtomicInt32_load(&ef->Waiting))
+	{
+		if (!SetEvent(ef->Event))
+			SEV_terminate();
+	}
+	else
+	{
+		SEV_AtomicInt32_store(&ef->Set, 1);
+		if (SEV_AtomicInt32_load(&ef->Waiting) && SEV_AtomicInt32_exchange(&ef->Set, 0))
+		{
+			if (!SetEvent(ef->Event))
+				SEV_terminate();
+		}
+	}
+}
+
+void SEV_EventFlag_reset(SEV_EventFlag *ef)
+{
+	SEV_AtomicInt32_store(&ef->Set, 0);
+	if (!ResetEvent(ef->Event))
+		SEV_terminate();
+}
+
+#else
+
+namespace sev::impl {
+
+struct EventFlag
 {
 public:
 	std::mutex Mutex;
@@ -58,19 +147,24 @@ public:
 	bool Delete;
 };
 
-EventFlagImpl *EventFlag::createImpl(bool manualReset, bool initialState)
+}
+
+errno_t SEV_EventFlag_init(SEV_EventFlag *ef, bool manualReset, bool initialState)
 {
-	EventFlagImpl *m = new EventFlagImpl();
+	ef->Impl = new (nothrow) sev::impl::EventFlag();
+	sev::impl::EventFlag *const m = ef->Impl;
+	if (!m) return ENOMEM;
 	m->Flag = initialState;
 	m->ResetValue = manualReset;
 	m->Reset = false;
 	m->Waiting = 0;
 	m->Delete = false;
-	return m;
+	return 0;
 }
 
-void EventFlag::destroyImpl(EventFlagImpl *m)
+void SEV_EventFlag_release(SEV_EventFlag *ef)
 {
+	sev::impl::EventFlag *const m = ef->Impl;
 	{
 		std::unique_lock<std::mutex> lock(m->Mutex);
 		if (m->Waiting)
@@ -86,8 +180,9 @@ void EventFlag::destroyImpl(EventFlagImpl *m)
 	delete m;
 }
 
-void EventFlag::waitImpl(EventFlagImpl *m)
+void SEV_EventFlag_wait(SEV_EventFlag *ef)
 {
+	sev::impl::EventFlag *const m = ef->Impl;
 	bool exc;
 	bool del;
 	{
@@ -107,11 +202,12 @@ void EventFlag::waitImpl(EventFlagImpl *m)
 	if (del)
 		delete m; // Delayed deletion while waiting for a thread
 	if (exc)
-		throw Exception("sev::EventFlag deleted while waiting", 1);
+		SEV_terminate(); // throw Exception("sev::EventFlag deleted while waiting", 1);
 }
 
-bool EventFlag::waitImpl(EventFlagImpl *m, int timeoutMs)
+bool SEV_EventFlag_waitFor(SEV_EventFlag *ef, int timeoutMs)
 {
+	sev::impl::EventFlag *const m = ef->Impl;
 	bool exc;
 	bool del;
 	bool res = true;
@@ -132,84 +228,26 @@ bool EventFlag::waitImpl(EventFlagImpl *m, int timeoutMs)
 	if (del)
 		delete m; // Delayed deletion while waiting for a thread
 	if (exc)
-		throw Exception("sev::EventFlag deleted while waiting", 1);
+		SEV_terminate(); // throw Exception("sev::EventFlag deleted while waiting", 1);
 	return res;
 }
 
-void EventFlag::setImpl(EventFlagImpl *m)
+void SEV_EventFlag_set(SEV_EventFlag *ef)
 {
+	sev::impl::EventFlag *const m = ef->Impl;
 	std::unique_lock<std::mutex> lock(m->Mutex);
 	m->Reset = false;
 	m->Flag = true;
 	m->CondVar.notify_one();
 }
 
-void EventFlag::resetImpl(EventFlagImpl *m)
+void SEV_EventFlag_reset(SEV_EventFlag *ef)
 {
+	sev::impl::EventFlag *const m = ef->Impl;
 	std::unique_lock<std::mutex> lock(m->Mutex);
 	m->Reset = true;
 }
 
-#endif
-
-}
-
-SEV_EventFlag SEV_EventFlag_create()
-{
-	try
-	{
-		SEV_EventFlag eventFlag;
-		new (&eventFlag) sev::EventFlag();
-		return eventFlag;
-	}
-	catch (...)
-	{
-		return null;
-	}
-}
-
-void SEV_EventFlag_destroy(SEV_EventFlag eventFlag)
-{
-	reinterpret_cast<sev::EventFlag &>(eventFlag).~EventFlag();
-}
-
-bool SEV_EventFlag_wait(SEV_EventFlag eventFlag)
-{
-	try
-	{
-		reinterpret_cast<sev::EventFlag &>(eventFlag).wait();
-		return true;
-	}
-	catch (...)
-	{
-		return false;
-	}
-}
-
-bool SEV_EventFlag_set(SEV_EventFlag eventFlag)
-{
-	try
-	{
-		reinterpret_cast<sev::EventFlag &>(eventFlag).set();
-		return true;
-	}
-	catch (...)
-	{
-		return false;
-	}
-}
-
-bool SEV_EventFlag_reset(SEV_EventFlag eventFlag)
-{
-	try
-	{
-		reinterpret_cast<sev::EventFlag &>(eventFlag).reset();
-		return true;
-	}
-	catch (...)
-	{
-		return false;
-	}
-}
+#endif 
 
 /* end of file */
