@@ -104,27 +104,24 @@ using std::nothrow;
 #	define SEV_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
-// Include debug_break
-#include <debugbreak.h>
-#define SEV_DEBUG_BREAK() debug_break()
-
 #if defined(_DEBUG) && !defined(NDEBUG)
 #define SEV_DEBUG
 #else
 #define SEV_RELEASE
 #endif
 
-// Assert
-#ifdef SEV_DEBUG
-#	define SEV_ASSERT(cond) do { if (!(cond)) SEV_DEBUG_BREAK(); } while (false)
-#else
-#	define SEV_ASSERT(cond) do { } while (false)
-#endif
+// Include debug_break
+#include <debugbreak.h>
+#define SEV_RELEASE_BREAK() debug_break()
 
 #ifdef SEV_DEBUG
-#	define SEV_DEBUG_SET(value) = (value)
+#define SEV_DEBUG_BREAK() debug_break()
+#define SEV_ASSERT(cond) do { if (!(cond)) SEV_DEBUG_BREAK(); } while (false)
+#define SEV_VERIFY(cond) do { if (!(cond)) SEV_DEBUG_BREAK(); } while (false)
 #else
-#	define SEV_DEBUG_SET(value)
+#define SEV_DEBUG_BREAK() do { } while (false)
+#define SEV_ASSERT(cond) do { } while (false)
+#define SEV_VERIFY(cond) do { cond; } while (false)
 #endif
 
 // Library export decl
@@ -138,8 +135,6 @@ using std::nothrow;
 
 #if defined(SEV_LIB_EXPORT)
 #ifdef _MSC_VER
-// #pragma warning(disable: 4577)
-// #pragma warning(disable: 4251)
 #endif
 #  define SEV_LIB SEV_DECL_EXPORT
 #elif defined(SEV_LIB_STATIC)

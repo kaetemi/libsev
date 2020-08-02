@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 void SEV_terminate()
 {
+	SEV_DEBUG_BREAK();
 	std::terminate();
 }
 
