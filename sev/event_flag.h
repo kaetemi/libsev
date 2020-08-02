@@ -86,6 +86,8 @@ struct SEV_EventFlag
 
 };
 
+static_assert(sizeof(SEV_EventFlag) == sizeof(void *) + sizeof(int) * 2);
+
 SEV_LIB errno_t SEV_EventFlag_init(SEV_EventFlag *ef, bool manualReset, bool initialState);
 SEV_LIB void SEV_EventFlag_release(SEV_EventFlag *ef);
 
