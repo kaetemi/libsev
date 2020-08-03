@@ -203,7 +203,7 @@ public:
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
 
-	inline const SEV_FunctorVt *raw() const { return &m; }
+	inline const SEV_FunctorVt *get() const { return &m; }
 
 	inline ptrdiff_t size() const { return m.Size; }
 	inline void constCopyConstructor(void *ptr, const void *other) const { return m.ConstCopyConstructor(ptr, other); }

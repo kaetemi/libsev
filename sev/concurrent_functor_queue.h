@@ -110,7 +110,7 @@ public:
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		fv.extract(vt, ptr);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->ConstCopyConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->ConstCopyConstructor))
 			throw std::bad_alloc();
 	}
 
@@ -120,7 +120,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, vt->raw()->CopyConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor))
 			throw std::bad_alloc();
 	}
 	
@@ -130,7 +130,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->raw(), vt->size(), ptr, movable ? vt->raw()->MoveConstructor : vt->raw()->CopyConstructor))
+		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor))
 			throw std::bad_alloc();
 	}
 
@@ -147,7 +147,7 @@ public:
 		};
 		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
 		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
-		static const TInvoke invokeCall = (TInvoke)wrapvt.raw()->Invoke;
+		static const TInvoke invokeCall = (TInvoke)wrapvt.get()->Invoke;
 		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
 		if (!err && ec) err = SEV_BadException;
 		return res;

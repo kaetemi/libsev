@@ -206,7 +206,7 @@ errno_t SEV_ConcurrentFunctorQueue_push(SEV_ConcurrentFunctorQueue *me, void(*f)
 		memcpy(ptr, data->ptr, data->size);
 		*(TFn *)(&((uint8_t *)ptr)[data->finalSize - sizeof(TFn)]) = data->f;
 	};
-	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.raw(), totalSize, (void *)&data, forwardConstructor);
+	return SEV_ConcurrentFunctorQueue_pushFunctorEx(me, vtable.get(), totalSize, (void *)&data, forwardConstructor);
 }
 
 errno_t SEV_ConcurrentFunctorQueue_pushFunctor(SEV_ConcurrentFunctorQueue *me, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))

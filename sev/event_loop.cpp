@@ -47,7 +47,7 @@ errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture,
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
 		SEV_ASSERT(movable);
-		return el->Vt->PostFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor);
+		return el->Vt->PostFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
 	}
 	catch (std::bad_alloc)
 	{
@@ -78,7 +78,7 @@ errno_t SEVIMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *captur
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
 		SEV_ASSERT(movable);
-		return el->Vt->InvokeFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor);
+		return el->Vt->InvokeFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
 	}
 	catch (std::bad_alloc)
 	{
@@ -109,7 +109,7 @@ errno_t SEVIMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *captu
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
 		SEV_ASSERT(movable);
-		return el->Vt->TimeoutFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor, timeoutMs);
+		return el->Vt->TimeoutFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, timeoutMs);
 	}
 	catch (std::bad_alloc)
 	{
@@ -140,7 +140,7 @@ errno_t SEVIMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capt
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
 		SEV_ASSERT(movable);
-		return el->Vt->IntervalFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor, intervalMs);
+		return el->Vt->IntervalFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, intervalMs);
 	}
 	catch (std::bad_alloc)
 	{
