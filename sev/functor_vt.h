@@ -57,8 +57,10 @@ struct SEV_FunctorVt
 
 SEV_LIB extern ptrdiff_t SEV_BadAlloc;
 SEV_LIB extern ptrdiff_t SEV_BadFunctionCall;
+SEV_LIB extern ptrdiff_t SEV_BadException;
 #define SEV_BadAlloc (&SEV_BadAlloc)
 #define SEV_BadFunctionCall (&SEV_BadFunctionCall)
+#define SEV_BadException (&SEV_BadException)
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -217,6 +219,7 @@ public:
 		if (!err) return;
 		if (err == SEV_BadAlloc) throw std::bad_alloc();
 		if (err == SEV_BadFunctionCall) throw std::bad_function_call();
+		if (err == SEV_BadException) throw std::bad_exception();
 		auto fin = gsl::finally([this, err]() { m.DestroyException(err); });
 		if (m.Rethrower != impl::rethrower()) throw std::bad_exception(); // Exception comes from elsewhere!
 		std::rethrow_exception(*(std::exception_ptr *)err);
