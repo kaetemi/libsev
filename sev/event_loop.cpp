@@ -70,7 +70,7 @@ private:
 #endif
 }
 
-errno_t SEVIMPL_IEventLoop_post(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size)
+errno_t SEVIMPL_IEventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
 	try
 	{
@@ -99,7 +99,7 @@ errno_t SEVIMPL_IEventLoop_post(SEV_IEventLoop *el, errno_t(*f)(void *capture, S
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_invoke(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size)
+errno_t SEVIMPL_IEventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
 	try
 	{
@@ -128,7 +128,7 @@ errno_t SEVIMPL_IEventLoop_invoke(SEV_IEventLoop *el, errno_t(*f)(void *capture,
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_timeout(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+errno_t SEVIMPL_IEventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
 {
 	try
 	{
@@ -157,7 +157,7 @@ errno_t SEVIMPL_IEventLoop_timeout(SEV_IEventLoop *el, errno_t(*f)(void *capture
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_interval(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+errno_t SEVIMPL_IEventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
 {
 	try
 	{
