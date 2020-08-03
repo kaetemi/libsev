@@ -108,170 +108,253 @@ SEV_ExceptionHandle SEV_Exception_capture(errno_t eno)
 		{
 		case EPERM:
 			e.What = "EPERM";
+			break;
 		case ENOENT:
 			e.What = "ENOENT";
+			break;
 		case ESRCH:
 			e.What = "ESRCH";
+			break;
 		case EINTR:
 			e.What = "EINTR";
+			break;
 		case EIO:
 			e.What = "EIO";
+			break;
 		case ENXIO:
 			e.What = "ENXIO";
+			break;
 		case E2BIG:
 			e.What = "E2BIG";
+			break;
 		case ENOEXEC:
 			e.What = "ENOEXEC";
+			break;
 		case EBADF:
 			e.What = "EBADF";
+			break;
 		case ECHILD:
 			e.What = "ECHILD";
+			break;
 		case EAGAIN:
 			e.What = "EAGAIN";
+			break;
 		case ENOMEM:
 			e.What = "ENOMEM";
+			break;
 		case EACCES:
 			e.What = "EACCES";
+			break;
 		case EFAULT:
 			e.What = "EFAULT";
+			break;
 		case EBUSY:
 			e.What = "EBUSY";
+			break;
 		case EEXIST:
 			e.What = "EEXIST";
+			break;
 		case EXDEV:
 			e.What = "EXDEV";
+			break;
 		case ENODEV:
 			e.What = "ENODEV";
+			break;
 		case ENOTDIR:
 			e.What = "ENOTDIR";
+			break;
 		case EISDIR:
 			e.What = "EISDIR";
+			break;
 		case ENFILE:
 			e.What = "ENFILE";
+			break;
 		case EMFILE:
 			e.What = "EMFILE";
+			break;
 		case ENOTTY:
 			e.What = "ENOTTY";
+			break;
 		case EFBIG:
 			e.What = "EFBIG";
+			break;
 		case ENOSPC:
 			e.What = "ENOSPC";
+			break;
 		case ESPIPE:
 			e.What = "ESPIPE";
+			break;
 		case EROFS:
 			e.What = "EROFS";
+			break;
 		case EMLINK:
 			e.What = "EMLINK";
+			break;
 		case EPIPE:
 			e.What = "EPIPE";
+			break;
 		case EDOM:
 			e.What = "EDOM";
+			break;
 		case EDEADLK:
 			e.What = "EDEADLK";
+			break;
 		case ENAMETOOLONG:
 			e.What = "ENAMETOOLONG";
+			break;
 		case ENOLCK:
 			e.What = "ENOLCK";
+			break;
 		case ENOSYS:
 			e.What = "ENOSYS";
+			break;
 		case ENOTEMPTY:
 			e.What = "ENOTEMPTY";
+			break;
 		case EINVAL:
 			e.What = "EINVAL";
+			break;
 		case ERANGE:
 			e.What = "ERANGE";
+			break;
 		case EILSEQ:
 			e.What = "EILSEQ";
+			break;
 		case STRUNCATE:
 			e.What = "STRUNCATE";
+			break;
 		case EADDRINUSE:
 			e.What = "EADDRINUSE";
+			break;
 		case EADDRNOTAVAIL:
 			e.What = "EADDRNOTAVAIL";
+			break;
 		case EAFNOSUPPORT:
 			e.What = "EAFNOSUPPORT";
+			break;
 		case EALREADY:
 			e.What = "EALREADY";
+			break;
 		case EBADMSG:
 			e.What = "EBADMSG";
+			break;
 		case ECANCELED:
 			e.What = "ECANCELED";
+			break;
 		case ECONNABORTED:
 			e.What = "ECONNABORTED";
+			break;
 		case ECONNREFUSED:
 			e.What = "ECONNREFUSED";
+			break;
 		case ECONNRESET:
 			e.What = "ECONNRESET";
+			break;
 		case EDESTADDRREQ:
 			e.What = "EDESTADDRREQ";
+			break;
 		case EHOSTUNREACH:
 			e.What = "EHOSTUNREACH";
+			break;
 		case EIDRM:
 			e.What = "EIDRM";
+			break;
 		case EINPROGRESS:
 			e.What = "EINPROGRESS";
+			break;
 		case EISCONN:
 			e.What = "EISCONN";
+			break;
 		case ELOOP:
 			e.What = "ELOOP";
+			break;
 		case EMSGSIZE:
 			e.What = "EMSGSIZE";
+			break;
 		case ENETDOWN:
 			e.What = "ENETDOWN";
+			break;
 		case ENETRESET:
 			e.What = "ENETRESET";
+			break;
 		case ENETUNREACH:
 			e.What = "ENETUNREACH";
+			break;
 		case ENOBUFS:
 			e.What = "ENOBUFS";
+			break;
 		case ENODATA:
 			e.What = "ENODATA";
+			break;
 		case ENOLINK:
 			e.What = "ENOLINK";
+			break;
 		case ENOMSG:
 			e.What = "ENOMSG";
+			break;
 		case ENOPROTOOPT:
 			e.What = "ENOPROTOOPT";
+			break;
 		case ENOSR:
 			e.What = "ENOSR";
+			break;
 		case ENOSTR:
 			e.What = "ENOSTR";
+			break;
 		case ENOTCONN:
 			e.What = "ENOTCONN";
+			break;
 		case ENOTRECOVERABLE:
 			e.What = "ENOTRECOVERABLE";
+			break;
 		case ENOTSOCK:
 			e.What = "ENOTSOCK";
+			break;
 		case ENOTSUP:
 			e.What = "ENOTSUP";
+			break;
 		case EOPNOTSUPP:
 			e.What = "EOPNOTSUPP";
+			break;
 		case EOTHER:
 			e.What = "EOTHER";
+			break;
 		case EOVERFLOW:
 			e.What = "EOVERFLOW";
+			break;
 		case EOWNERDEAD:
 			e.What = "EOWNERDEAD";
+			break;
 		case EPROTO:
 			e.What = "EPROTO";
+			break;
 		case EPROTONOSUPPORT:
 			e.What = "EPROTONOSUPPORT";
+			break;
 		case EPROTOTYPE:
 			e.What = "EPROTOTYPE";
+			break;
 		case ETIME:
 			e.What = "ETIME";
+			break;
 		case ETIMEDOUT:
 			e.What = "ETIMEDOUT";
+			break;
 		case ETXTBSY:
 			e.What = "ETXTBSY";
+			break;
 		case EWOULDBLOCK:
 			e.What = "EWOULDBLOCK";
+			break;
+		default:
+			e.What = "errno_t";
+			break;
 		}
 		e.Rethrower = &sev::impl::s_ErrNo;
 		e.ErrNo = eno;
 		e.Static = true;
 		sev::impl::s_ErrNo[eno] = e;
-		return &e;
+		return &sev::impl::s_ErrNo[eno];
 	}
 }
 
@@ -300,10 +383,17 @@ SEV_ExceptionHandle SEV_Exception_captureEx(void *exception, const char *what, v
 	sev::impl::Exception *e = new (nothrow) sev::impl::Exception();
 	if (!e) return &sev::impl::s_BadException;
 	e->Exception = exception;
-	size_t whatLen = strlen(what) + 1;
-	char *whatStr = new (nothrow) char[whatLen];
-	if (whatStr) memcpy(whatStr, what, whatLen);
-	e->What = whatStr;
+	if (what)
+	{
+		size_t whatLen = strlen(what) + 1;
+		char *whatStr = new (nothrow) char[whatLen];
+		if (whatStr) memcpy(whatStr, what, whatLen);
+		e->What = whatStr;
+	}
+	else
+	{
+		e->What = null;
+	}
 	e->Destroy = destroy;
 	e->Rethrower = rethrower;
 	e->ErrNo = eno;

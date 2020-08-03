@@ -118,8 +118,8 @@ public:
 		void (*destroy)(void *exception);
 		void *rethrower;
 		errno_t eno;
-		SEV_Exception_extractEx(eh, &exception, &what, &exception, &rethrower, &eno);
-		gsl::finally([this]() -> { discard(); }); // Release when throwing!
+		SEV_Exception_extractEx(eh, &exception, &what, &destroy, &rethrower, &eno);
+		auto fin = gsl::finally([this]() -> void { discard(); }); // Release when throwing!
 		if (rethrower == impl::rethrower())
 		{
 			// Same standard library, we can rethrow this as-is!
@@ -143,9 +143,9 @@ public:
 				throw std::domain_error(what ? what : "Failed to capture exception message");
 				break;
 			case ENOMEM:
-				throw std::bad_alloc(what ? what : "Failed to capture exception message");
+				throw std::bad_alloc(); // NOTE: Cannot pass message
 				break;
-			default: // case EOTHER:
+			default:
 				throw std::exception(what ? what : "Failed to capture exception message");
 				break;
 			}
@@ -207,13 +207,14 @@ public:
 	}
 
 private:
-	void p_capture(std::exception_ptr ptr, const char *what, errno_t eno)
+	void p_capture(std::exception_ptr ptr, const char *what, errno_t eno) noexcept
 	{
 		void *exception = new (nothrow) std::exception_ptr(ptr);
 		if (!exception) // Unable to allocate
 		{
 			eh = SEV_Exception_capture(eno); // Get a generic if possible
 		}
+		SEV_ASSERT(*(std::exception_ptr *)exception);
 		auto destroy = [](void *exception) {
 			delete exception;
 		};

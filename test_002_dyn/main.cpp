@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/concurrent_functor_queue.h>
 #include <sev/atomic_shared_mutex.h>
 #include <sev/event_loop.h>
+#include <sev/exception.h>
 
 /*
 Local allocation count: 0
@@ -128,6 +129,38 @@ void operator delete(void *ptr) noexcept
 
 int main()
 {
+	{
+		ptrdiff_t z = s_AllocationCount;
+		std::cout << "Local allocation count: "sv << z << "\n"sv;
+	}
+	{
+		try
+		{
+			sev::ExceptionHandle eh;
+			eh.capture<void>([]() -> void {
+				throw std::invalid_argument("Exception caught successfully!");
+			});
+			std::cout << "Exception should follow:" << std::endl;
+			eh.rethrow();
+		}
+		catch (const std::invalid_argument &ex)
+		{
+			std::cout << ex.what() << std::endl;
+		}
+	}
+	{
+		try
+		{
+			sev::ExceptionHandle eh;
+			eh.capture(EINVAL);
+			std::cout << "Exception should follow:" << std::endl;
+			eh.rethrow();
+		}
+		catch (const std::invalid_argument &ex)
+		{
+			std::cout << ex.what() << std::endl;
+		}
+	}
 	{
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << "\n"sv;
