@@ -213,6 +213,7 @@ private:
 		if (!exception) // Unable to allocate
 		{
 			eh = SEV_Exception_capture(eno); // Get a generic if possible
+			return;
 		}
 		SEV_ASSERT(*(std::exception_ptr *)exception);
 		auto destroy = [](void *exception) {
