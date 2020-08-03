@@ -29,6 +29,240 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "event_loop.h"
 
+namespace sev::impl {
+#if 0
+class EventLoop : public IEventLoop
+{
+public:
+	EventLoop(std::nothrow_t) noexcept
+	{
+	}
+
+	virtual ~EventLoop() noexcept
+	{
+
+	}
+
+	virtual void post(EventFunctorView &&f) override
+	{
+	
+	}
+	
+	virtual void invoke(EventFunctorView &&f) override
+	{
+		throw std::bad_function_call();
+	}
+	
+	virtual void timeout(EventFunctorView &&f, int timeoutMs) override
+	{
+		throw std::bad_function_call();
+	}
+	
+	virtual void interval(EventFunctorView &&f, int intervalMs) override
+	{
+		throw std::bad_function_call();
+	}
+
+private:
+	std::vector<std::thread> m_Threads;
+
+};
+#endif
+}
+
+errno_t SEVIMPL_IEventLoop_post(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size)
+{
+	try
+	{
+		std::vector<uint8_t> v(size);
+		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+		});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->PostFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEVIMPL_IEventLoop_invoke(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size)
+{
+	try
+	{
+		std::vector<uint8_t> v(size);
+		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+		});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->InvokeFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEVIMPL_IEventLoop_timeout(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+{
+	try
+	{
+		std::vector<uint8_t> v(size);
+		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+		});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->TimeoutFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor, timeoutMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEVIMPL_IEventLoop_interval(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+{
+	try
+	{
+		std::vector<uint8_t> v(size);
+		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+		});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->IntervalFunctor(el, vt->raw(), ptr, vt->raw()->MoveConstructor, intervalMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+/*
+SEV_EventLoop *SEV_EventLoop_create()
+{
+	//return new (nothrow) sev::impl::EventLoop(nothrow);
+}
+*/
+
+#if 0
+errno_t SEV_EventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+{
+	try
+	{
+		el->post(f, capture, size);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEV_EventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+{
+	try
+	{
+		el->invoke(f, capture, size);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEV_EventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+{
+	try
+	{
+		el->timeout(f, capture, size, timeoutMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+errno_t SEV_EventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+{
+	try
+	{
+		el->interval(f, capture, size, intervalMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+#endif
+
 namespace sev {
 
 #if 0

@@ -31,39 +31,75 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_EVENT_LOOP_H
 
 #include "platform.h"
-#ifdef __cplusplus
-
-#ifdef _MSC_VER
-#define SEV_EVENT_LOOP_CONCURRENT_QUEUE
-#endif
-
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <variant>
-
-#include <functional>
-
-#include <queue>
-#include <set>
-
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-#	include <concurrent_queue.h>
-#	include <concurrent_priority_queue.h>
-#else
-#	include "atomic_mutex.h"
-#endif
 
 #include "event_flag.h"
 #include "functor_view.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct SEV_IEventLoopVt;
+struct SEV_IEventLoop
+{
+	SEV_IEventLoopVt *Vt;
+
+};
+
+struct SEV_IEventLoopVt
+{
+	void(*Destroy)(SEV_IEventLoop *el);
+
+	errno_t(*Post)(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size);
+	errno_t(*Invoke)(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size);
+	errno_t(*Timeout)(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
+	errno_t(*Interval)(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+
+	errno_t(*PostFunctor)(SEV_IEventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+	errno_t(*InvokeFunctor)(SEV_IEventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+	errno_t(*TimeoutFunctor)(SEV_IEventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs);
+	errno_t(*IntervalFunctor)(SEV_IEventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
+
+	errno_t(*Cancel)(SEV_IEventLoop *el);
+
+	void(*Run)(SEV_IEventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+	errno_t(*Loop)(SEV_IEventLoop *el);
+	void(*Stop)(SEV_IEventLoop *el);
+
+};
+
+// SEV_LIB extern SEV_IEventLoopVt SEV_EventLoopBase;
+// SEV_LIB extern SEV_IEventLoopVt SEV_EventLoop;
+
+// Generic implementations, work with all event loops
+SEV_LIB errno_t SEVIMPL_IEventLoop_post(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEVIMPL_IEventLoop_invoke(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEVIMPL_IEventLoop_timeout(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
+SEV_LIB errno_t SEVIMPL_IEventLoop_interval(SEV_IEventLoop *el, errno_t(*f)(void *capture, SEV_IEventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+
+// Create an event loop
 /*
+SEV_LIB SEV_EventLoop *SEV_EventLoop_create();
+SEV_LIB errno_t SEV_EventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEV_EventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEV_EventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
+SEV_LIB errno_t SEV_EventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+*/
 
-TODO: IEventLoop
-TODO: Try ring buffer?
-TODO: Remove stl stuff from class definition...
+#ifdef __cplusplus
+}
+#endif
 
-Can we make an virtual anonymizer thing like std::function, but for stl classes so they can be popped through dll interfaces?
+#ifdef __cplusplus
+namespace sev {
+typedef SEV_IEventLoop IEventLoop;
+typedef FunctorVt<void(IEventLoop &el)> EventFunctorVt;
+typedef Functor<void(IEventLoop &el)> EventFunctor;
+typedef FunctorView<void(IEventLoop &el) > EventFunctorView;
+}
+#endif
+
+/*
 
 TODO: Class SingleLoop, MultiLoop, has virtual loop() = 0. Event loops can inherit from this to compose the thread start or synchronous run utility functions into the class.
 Just have std::thread in a pointer, so we don't need to deal with weird stuff.
@@ -72,24 +108,90 @@ Actually for our own types based on STL templates, we can enforce a DLL-exported
 
 */
 
+#ifdef __cplusplus
+
 namespace sev {
 
-/*
-struct EventLoopOptions
+#if 0
+enum class TEventLoop
 {
-	bool EnableFibers = true;
-	bool EnableTimers = true;
-	bool EnableIO = true;
-}
-*/
+	Generic,
+	Win32,
 
-class SEV_LIB IEventLoop;
+};
 
-typedef FunctorView<void(IEventLoop &el)> EventFunctorView; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
-typedef Functor<void(IEventLoop &el)> EventFunctor; // TODO: Can't use STL here due to DLL boundary :/ Need to make our own container
-// typedef std::function<void(ptrdiff_t)> EventKernel;
+typedef FunctorView<void(IEventLoop &el)> EventFunctorView; 
+typedef Functor<void(IEventLoop &el)> EventFunctor;
 
-// Or... typedef std::function<void(IEventLoop &el)> EventFunctorView; ?
+class IEventLoop
+{
+public:
+	static SEV_FORCE_INLINE IEventLoop *create(TEventLoop type)
+	{
+		if (type == TEventLoop::Generic)
+		{
+			IEventLoop *el = SEV_EventLoop_create();
+			if (!el)
+				throw std::bad_alloc();
+			return el;
+		}
+		else
+		{
+			throw std::exception();
+		}
+	}
+
+	SEV_FORCE_INLINE IEventLoop() { }
+	SEV_FORCE_INLINE virtual ~IEventLoop() noexcept { }
+	
+	SEV_FORCE_INLINE virtual void post(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+	{
+		errno_t err = SEV_IEventLoop_post(this, f, capture, size);
+		if (!err) return;
+		if (err == ENOMEM) throw std::bad_alloc();
+		throw std::exception();
+	}
+
+	SEV_FORCE_INLINE virtual void invoke(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+	{
+		errno_t err = SEV_IEventLoop_invoke(this, f, capture, size);
+		if (!err) return;
+		if (err == ENOMEM) throw std::bad_alloc();
+		throw std::exception();
+	}
+
+	SEV_FORCE_INLINE virtual void timeout(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+	{
+		errno_t err = SEV_IEventLoop_timeout(this, f, capture, size, timeoutMs);
+		if (!err) return;
+		if (err == ENOMEM) throw std::bad_alloc();
+		throw std::exception();
+	}
+
+	SEV_FORCE_INLINE virtual void interval(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+	{
+		errno_t err = SEV_IEventLoop_interval(this, f, capture, size, intervalMs);
+		if (!err) return;
+		if (err == ENOMEM) throw std::bad_alloc();
+		throw std::exception();
+	}
+	
+	virtual void post(EventFunctorView &&f) = 0;
+	virtual void invoke(EventFunctorView &&f) = 0;
+	virtual void timeout(EventFunctorView &&f, int timeoutMs) = 0;
+	virtual void interval(EventFunctorView &&f, int intervalMs)  = 0;
+
+	virtual void loop() = 0;
+	virtual void run() = 0;
+
+	SEV_FORCE_INLINE IEventLoop(const IEventLoop &other) = delete;
+	SEV_FORCE_INLINE IEventLoop &operator=(const IEventLoop &other) = delete;
+	
+	SEV_FORCE_INLINE IEventLoop(IEventLoop &&other) noexcept = delete;
+	SEV_FORCE_INLINE IEventLoop &operator=(IEventLoop &&other) noexcept = delete;
+
+};
+#endif
 
 #if 0
 

@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sev/functor_view.h>
 #include <sev/concurrent_functor_queue.h>
 #include <sev/atomic_shared_mutex.h>
+#include <sev/event_loop.h>
 
 /*
 Local allocation count: 0
