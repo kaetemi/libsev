@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_FUNCTOR_VT_H
 
 #include "platform.h"
+#include "exception.h"
 
 #define SEV_FUNCTOR_ALIGN 64
 
@@ -48,6 +49,7 @@ struct SEV_FunctorVt
 	void(*Destroy)(void *ptr);
 
 	void *Invoke;
+	void *TryInvoke;
 
 	void *Rethrower; // If this matches your local rethrower, the exception can be rethrown!
 	void *InvokeCatch; // Invoke with catch, returns error in argument (or returns the address of SEV_BadAlloc in case of memory trouble, or SEV_BadFunctionCall)
@@ -70,12 +72,6 @@ SEV_LIB extern ptrdiff_t SEV_BadException;
 
 namespace sev {
 
-namespace impl {
-
-constexpr void *rethrower() { return __ExceptionPtrRethrow; }
-
-} /* namespace impl */
-
 template<class TFn>
 struct FunctorVt;
 template<class TRes, class... TArgs>
@@ -87,6 +83,7 @@ public:
 	using TMoveConstructor = void(*)(void *ptr, void *other);
 	using TDestroy = void(*)(void *ptr);
 	using TInvoke = TRes(*)(void *ptr, TArgs...);
+	using TTryInvoke = TRes(*)(void *ptr, ExceptionHandle &, TArgs...);
 	using TInvokeCatch = TRes(*)(void *ptr, void **err, TArgs...);
 	using TDestroyException = void(*)(void *ptr);
 	
@@ -97,6 +94,7 @@ public:
 		, /*MoveConstructor*/([](void *, void *) -> void {})
 		, /*Destroy*/([](void *) -> void {})
 		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); }))
+		, /*TryInvoke*/((TTryInvoke)([](void *, ExceptionHandle &, TArgs...) -> TRes { throw std::bad_function_call(); }))
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *, void **err, TArgs...) -> TRes { *err = SEV_BadFunctionCall; return TRes(); }))
 		, /*DestroyException*/([](void *) -> void {}) }
@@ -136,6 +134,11 @@ public:
 		}), /*Invoke*/(TInvoke)([](void *ptr, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			return (*f)(args...);
+		}), /*TryInvoke*/(TTryInvoke)([](void *ptr, ExceptionHandle &eh, TArgs... args) -> TRes {
+			TFunc *f = reinterpret_cast<TFunc *>(ptr);
+			return eh.capture<TRes>([&]() -> TRes {
+				return (*f)(args...);
+			});
 		})
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
@@ -190,7 +193,10 @@ public:
 		}), /*Invoke*/(TInvoke)([](void *ptr, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			return (*f)(args...);
-		})
+		}), /*TryInvoke*/(TTryInvoke)([](void *ptr, ExceptionHandle &, TArgs... args) -> TRes {
+			TFunc *f = reinterpret_cast<TFunc *>(ptr);
+			return (*f)(args...);
+			})
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);

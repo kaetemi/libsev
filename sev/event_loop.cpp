@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "event_loop.h"
 
-errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
 	// Generic unoptimized wrapper
 	try
@@ -60,7 +60,7 @@ errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture,
 	return 0;
 }
 
-errno_t SEVIMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+errno_t SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
 	// Generic unoptimized wrapper
 	try
@@ -91,7 +91,7 @@ errno_t SEVIMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *captur
 	return 0;
 }
 
-errno_t SEVIMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
 {
 	// Generic unoptimized wrapper
 	try
@@ -122,7 +122,7 @@ errno_t SEVIMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *captu
 	return 0;
 }
 
-errno_t SEVIMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
 {
 	// Generic unoptimized wrapper
 	try

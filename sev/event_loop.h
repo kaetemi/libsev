@@ -78,10 +78,10 @@ static_assert(sizeof(SEV_EventLoopVt) == 32 * sizeof(void *));
 #endif
 
 // Generic implementations, work with all event loops
-SEV_LIB errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-SEV_LIB errno_t SEVIMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-SEV_LIB errno_t SEVIMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
-SEV_LIB errno_t SEVIMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
 
 SEV_LIB void SEV_EventLoop_destroy(SEV_EventLoop *el);
 
