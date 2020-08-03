@@ -61,12 +61,19 @@ struct SEV_EventLoopVt
 	errno_t(*IntervalFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
 	void(*Cancel)(SEV_EventLoop *el);
+	errno_t(*Join)(SEV_EventLoop *el, bool empty);
 
 	void(*Run)(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 	errno_t(*Loop)(SEV_EventLoop *el);
 	void(*Stop)(SEV_EventLoop *el);
 
+	ptrdiff_t Reserved[32 - 14];
+
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(SEV_EventLoopVt) == 32 * sizeof(void *));
+#endif
 
 // Generic implementations, work with all event loops
 SEV_LIB errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
@@ -87,6 +94,7 @@ SEV_LIB errno_t SEV_EventLoop_timeoutFunctor(SEV_EventLoop *el, const SEV_Functo
 SEV_LIB errno_t SEV_EventLoop_intervalFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
 SEV_LIB void SEV_EventLoop_cancel(SEV_EventLoop *el);
+SEV_LIB errno_t SEV_EventLoop_join(SEV_EventLoop *el, bool empty);
 
 SEV_LIB void SEV_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 SEV_LIB errno_t SEV_EventLoop_loop(SEV_EventLoop *el);

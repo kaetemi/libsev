@@ -29,52 +29,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "event_loop.h"
 
-namespace sev::impl {
-#if 0
-class EventLoop : public IEventLoop
+errno_t SEVIMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
-public:
-	EventLoop(std::nothrow_t) noexcept
-	{
-	}
-
-	virtual ~EventLoop() noexcept
-	{
-
-	}
-
-	virtual void post(EventFunctorView &&f) override
-	{
-	
-	}
-	
-	virtual void invoke(EventFunctorView &&f) override
-	{
-		throw std::bad_function_call();
-	}
-	
-	virtual void timeout(EventFunctorView &&f, int timeoutMs) override
-	{
-		throw std::bad_function_call();
-	}
-	
-	virtual void interval(EventFunctorView &&f, int intervalMs) override
-	{
-		throw std::bad_function_call();
-	}
-
-private:
-	std::vector<std::thread> m_Threads;
-
-};
-#endif
-}
-
-errno_t SEVIMPL_IEventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
-{
+	// Generic unoptimized wrapper
 	try
 	{
 		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
 		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
 			errno_t err = f((void *)&v[0], &el);
 			if (!err) return;
@@ -99,11 +60,13 @@ errno_t SEVIMPL_IEventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SE
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+errno_t SEVIMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
+	// Generic unoptimized wrapper
 	try
 	{
 		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
 		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
 			errno_t err = f((void *)&v[0], &el);
 			if (!err) return;
@@ -128,11 +91,13 @@ errno_t SEVIMPL_IEventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, 
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+errno_t SEVIMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
 {
+	// Generic unoptimized wrapper
 	try
 	{
 		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
 		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
 			errno_t err = f((void *)&v[0], &el);
 			if (!err) return;
@@ -157,11 +122,13 @@ errno_t SEVIMPL_IEventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture,
 	return 0;
 }
 
-errno_t SEVIMPL_IEventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+errno_t SEVIMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
 {
+	// Generic unoptimized wrapper
 	try
 	{
 		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
 		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
 			errno_t err = f((void *)&v[0], &el);
 			if (!err) return;
@@ -186,82 +153,94 @@ errno_t SEVIMPL_IEventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture
 	return 0;
 }
 
-/*
-SEV_EventLoop *SEV_EventLoop_create()
+void SEV_EventLoop_destroy(SEV_EventLoop *el)
 {
-	//return new (nothrow) sev::impl::EventLoop(nothrow);
+	el->Vt->Destroy(el);
 }
-*/
 
-#if 0
 errno_t SEV_EventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
-	try
-	{
-		el->post(f, capture, size);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
+	return el->Vt->Post(el, f, capture, size);
 }
 
 errno_t SEV_EventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 {
-	try
-	{
-		el->invoke(f, capture, size);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
+	return el->Vt->Invoke(el, f, capture, size);
 }
 
 errno_t SEV_EventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
 {
-	try
-	{
-		el->timeout(f, capture, size, timeoutMs);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
+	return el->Vt->Timeout(el, f, capture, size, timeoutMs);
 }
 
 errno_t SEV_EventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
 {
-	try
-	{
-		el->interval(f, capture, size, intervalMs);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
+	return el->Vt->Interval(el, f, capture, size, intervalMs);
 }
-#endif
+
+errno_t SEV_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+{
+	return el->Vt->PostFunctor(el, vt, ptr, forwardConstructor);
+}
+
+errno_t SEV_EventLoop_invokeFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+{
+	return el->Vt->InvokeFunctor(el, vt, ptr, forwardConstructor);
+}
+
+errno_t SEV_EventLoop_timeoutFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs)
+{
+	return el->Vt->TimeoutFunctor(el, vt, ptr, forwardConstructor, timeoutMs);
+}
+
+errno_t SEV_EventLoop_intervalFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs)
+{
+	return el->Vt->IntervalFunctor(el, vt, ptr, forwardConstructor, intervalMs);
+}
+
+void SEV_EventLoop_cancel(SEV_EventLoop *el)
+{
+	el->Vt->Cancel(el);
+}
+
+errno_t SEV_EventLoop_join(SEV_EventLoop *el, bool empty)
+{
+	return el->Vt->Join(el, empty);
+}
+
+void SEV_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+{
+	el->Vt->Run(el, onError, ptr, forwardConstructor);
+}
+
+errno_t SEV_EventLoop_loop(SEV_EventLoop *el)
+{
+	return el->Vt->Loop(el);
+}
+
+void SEV_EventLoop_stop(SEV_EventLoop *el)
+{
+	el->Vt->Stop(el);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 namespace sev {
 
