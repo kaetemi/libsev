@@ -40,8 +40,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
-// NOTE: Maybe an exception translater & container that can reference and translate C and stl exceptions & throws automatically in the destructor would be useful!
-
 struct SEV_EventLoopVt;
 struct SEV_EventLoop
 {
