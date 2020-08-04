@@ -249,7 +249,7 @@ public:
 	}
 
 	EventFlag Flag;
-	ConcurrentFunctorQueue<void(EventLoop &)> Queue;
+	ConcurrentFunctorQueue<errno_t(EventLoop &)> Queue;
 };
 
 }
@@ -281,20 +281,19 @@ errno_t SEV_IMPL_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *v
 
 void SEV_IMPL_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh, const SEV_FunctorVt *vt, void *ptr)
 {
-	/*
 	// NOTE: Invoke catches any errors, and passes them down!
 	SEV_ASSERT(eh);
 	SEV_ASSERT(!*eh);
 	sev::impl::el::EventLoop *elp = (sev::impl::el::EventLoop *)el;
 	sev::EventFlag flag;
-	errno_t eno = elp->Queue.push(nothrow, [=, &flag]() -> errno_t {
-		errno_t res = ((sev::EventFunctorVt *)vt)->invoke(ptr, *(sev::ExceptionHandle *)eh, *(sev::EventLoop *)el);
+	errno_t eno = elp->Queue.push(nothrow, [=, &flag](sev::EventLoop &elref) -> errno_t {
+		errno_t res = ((sev::EventFunctorVt *)vt)->invoke(ptr, *(sev::ExceptionHandle *)eh, elref);
 		if (!*eh && res) SEV_Exception_capture(res);
 		flag.set();
+		return SEV_ESUCCESS;
 	});
 	if (eno) SEV_Exception_capture(eno);
 	flag.wait();
-	*/
 }
 
 
