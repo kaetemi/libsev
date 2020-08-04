@@ -358,6 +358,11 @@ void SEV_IMPL_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh)
 	if (elp->Stopping)
 		return;
 	elp->Running = true;
+	if (elp->Stopping)
+	{
+		elp->Running = false;
+		return;
+	}
 	++elp->Threads;
 	while (elp->Running)
 	{
@@ -395,21 +400,23 @@ void SEV_IMPL_EventLoop_stop(SEV_EventLoop *el)
 		// Wait for managed threads
 		for (std::thread &t : elp->ManagedThreads)
 		{
-			try
+			if (t.joinable())
 			{
-				if (t.joinable())
+				try
+				{
 					t.join();
-			}
-			catch (...)
-			{
-				// ...
+				}
+				catch (...)
+				{
+					// ...
+				}
 			}
 		}
 		elp->ManagedThreads.clear();
 		while (elp->Threads)
 		{
 			// Wait for other threads
-			SEV_ASSERT(!elp->Running);
+			// SEV_ASSERT(!elp->Running);
 			elp->LoopEndedFlag.wait();
 		}
 		elp->Stopping = false;
