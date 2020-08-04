@@ -51,10 +51,6 @@ struct SEV_FunctorVt
 	void *Invoke;
 	void *TryInvoke;
 
-	void *Rethrower; // If this matches your local rethrower, the exception can be rethrown!
-	void *InvokeCatch; // Invoke with catch, returns error in argument (or returns the address of SEV_BadAlloc in case of memory trouble, or SEV_BadFunctionCall)
-	void(*DestroyException)(void *err);
-
 };
 
 SEV_LIB extern ptrdiff_t SEV_BadAlloc;
@@ -95,11 +91,6 @@ public:
 		, /*Destroy*/([](void *) -> void {})
 		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); }))
 		, /*TryInvoke*/((TTryInvoke)([](void *, ExceptionHandle &, TArgs...) -> TRes { throw std::bad_function_call(); })) }
-#if 0
-		, /*Rethrower*/impl::rethrower()
-		, /*InvokeCatch*/((TInvokeCatch)([](void *, void **err, TArgs...) -> TRes { *err = SEV_BadFunctionCall; return TRes(); }))
-		, /*DestroyException*/([](void *) -> void {}) }
-#endif
 	{
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
@@ -142,29 +133,6 @@ public:
 				return (*f)(args...);
 			});
 		})}
-#if 0
-		, /*Rethrower*/impl::rethrower()
-		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
-			try
-			{
-				TFunc *f = reinterpret_cast<TFunc *>(ptr);
-				*err = null;
-				return (*f)(args...);
-			}
-			catch (...)
-			{
-				std::exception_ptr ex = std::current_exception();
-				*err = new (nothrow) std::exception_ptr(ex);
-				if (!*err) *err = SEV_BadAlloc;
-			}
-			return TRes();
-		})),
-		([](void *err) -> void {
-			SEV_ASSERT(err != SEV_BadFunctionCall);
-			if (err != SEV_BadAlloc)
-				delete err;
-		})
-#endif
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
@@ -200,14 +168,6 @@ public:
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			return (*f)(args...);
 			})}
-#if 0
-		, /*Rethrower*/impl::rethrower()
-		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
-			TFunc *f = reinterpret_cast<TFunc *>(ptr);
-			return (*f)(args...);
-		})),
-		([](void *err) -> void { })
-#endif
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
@@ -222,18 +182,7 @@ public:
 	inline void destroy(void *ptr) const { return m.Destroy(ptr); }
 
 	inline TRes invoke(void *ptr, TArgs... value) const { return ((TInvoke)m.Invoke)(ptr, value...); }
-	inline TRes invoke(void *ptr, void **err, TArgs... value) const { return ((TInvokeCatch)m.InvokeCatch)(ptr, err, value...); }
-
-	inline void rethrow(void *err) const
-	{
-		if (!err) return;
-		if (err == SEV_BadAlloc) throw std::bad_alloc();
-		if (err == SEV_BadFunctionCall) throw std::bad_function_call();
-		if (err == SEV_BadException) throw std::bad_exception();
-		auto fin = gsl::finally([this, err]() { m.DestroyException(err); });
-		if (m.Rethrower != impl::rethrower()) throw std::bad_exception(); // Exception comes from elsewhere!
-		std::rethrow_exception(*(std::exception_ptr *)err);
-	}
+	inline TRes invoke(void *ptr, ExceptionHandle &eh, TArgs... value) const { return ((TInvokeCatch)m.TryInvoke)(ptr, &eh, value...); }
 
 private:
 	const SEV_FunctorVt m;
