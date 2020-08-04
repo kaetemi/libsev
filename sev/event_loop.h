@@ -63,7 +63,6 @@ struct SEV_EventLoopVt
 	errno_t(*TimeoutFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs);
 	errno_t(*IntervalFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
-	void(*Cancel)(SEV_EventLoop *el);
 	errno_t(*Join)(SEV_EventLoop *el, bool empty);
 
 	errno_t(*Run)(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other)); // void(SEV_ExceptionHandle *eh)
@@ -91,7 +90,6 @@ SEV_LIB void SEV_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle 
 SEV_LIB errno_t SEV_EventLoop_timeoutFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs);
 SEV_LIB errno_t SEV_EventLoop_intervalFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
-SEV_LIB void SEV_EventLoop_cancel(SEV_EventLoop *el);
 SEV_LIB errno_t SEV_EventLoop_join(SEV_EventLoop *el, bool empty);
 
 SEV_LIB errno_t SEV_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other));

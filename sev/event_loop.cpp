@@ -75,11 +75,6 @@ errno_t SEV_EventLoop_intervalFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt
 	return el->Vt->IntervalFunctor(el, vt, ptr, forwardConstructor, intervalMs);
 }
 
-void SEV_EventLoop_cancel(SEV_EventLoop *el)
-{
-	el->Vt->Cancel(el);
-}
-
 errno_t SEV_EventLoop_join(SEV_EventLoop *el, bool empty)
 {
 	return el->Vt->Join(el, empty);
@@ -230,7 +225,6 @@ SEV_EventLoopVt EventLoopVt = {
 	null, // TimeoutFunctor
 	null, // IntervalFunctor
 
-	null, // Cancel
 	null, // Join
 
 	SEV_IMPL_EventLoop_run, // Run

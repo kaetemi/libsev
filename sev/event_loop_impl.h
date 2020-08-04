@@ -32,6 +32,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SEV_EVENT_LOOP_IMPL_H
 
 #include "platform.h"
+
+#ifdef _MSC_VER
+#define SEV_EVENT_LOOP_MSVC_CONCURRENT
+#endif
+
 #include "event_loop.h"
 #include "concurrent_functor_queue.h"
 
@@ -39,9 +44,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 #include <vector>
 
+#ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
+#include <concurrent_priority_queue.h>
+#else
+#include <queue>
+#endif
+
 namespace sev::impl::el {
 
 extern SEV_EventLoopVt EventLoopVt;
+
+struct TimeoutFunctor
+{
+	EventFunctor Functor; // Return ECANCELED to stop an interval
+	std::chrono::steady_clock::time_point Time;
+	std::chrono::steady_clock::duration Interval;
+
+	bool operator <(const TimeoutFunctor &o) const
+	{
+		return Time > o.Time;
+	}
+
+};
 
 class EventLoop : public SEV_EventLoop
 {
@@ -62,6 +86,13 @@ public:
 	std::vector<std::thread> ManagedThreads;
 	std::atomic_bool Stopping;
 	EventFlag LoopEndedFlag;
+
+#ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
+	concurrency::concurrent_priority_queue<TimeoutFunctor> TimeoutConcurrent;
+#else
+	AtomicMutex m_QueueTimeoutLock;
+	std::priority_queue<TimeoutFunctor> m_Timeout;
+#endif
 
 	EventLoop(const EventLoop &) = delete;
 	EventLoop(EventLoop &&) = delete;

@@ -179,7 +179,6 @@ static inline void SEV_AtomicSharedMutex_unlockShared(SEV_AtomicSharedMutex *me)
 
 namespace sev {
 
-#if 1
 //! Lock allowing one unique writer and multiple shared readers
 class AtomicSharedMutex
 {
@@ -255,112 +254,6 @@ private:
 	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
 
 }; /* class AtomicSharedMutex */
-#else
-//! Lock allowing one unique writer and multiple shared readers
-class AtomicSharedMutex
-{
-public:
-	inline AtomicSharedMutex() noexcept : m_Unique(false), m_Sharing(0)
-	{
-
-	}
-
-#ifdef SEV_DEBUG
-	inline ~AtomicSharedMutex() noexcept
-	{
-		if (!try_lock())
-			debug_break(); // Must be unlocked before destroying
-	}
-#endif
-
-	inline bool try_lock() noexcept
-	{
-		if (m_Unique.exchange(true))
-			return false; // Already locked for unique
-		if (m_Sharing) // Successfully locked for unique, but busy sharing
-		{
-			m_Unique.exchange(false); // Unlock unique
-			return false; // Already busy for sharing
-		}
-		return true; // Successfully locked for unique and sharing
-	}
-
-	inline bool tryLock() noexcept
-	{
-		return try_lock();
-	}
-
-	inline void lock() noexcept
-	{
-		while (m_Unique.exchange(true))
-			std::this_thread::yield();
-		while (m_Sharing)
-			std::this_thread::yield();
-	}
-
-	inline void unlock() noexcept
-	{
-#ifndef NDEBUG
-		if (!m_Unique.exchange(false))
-			debug_break(); // Already unlocked before
-#else
-		m_Unique.exchange(false);
-#endif
-	}
-
-	inline bool try_lock_shared() noexcept
-	{
-		++m_Sharing;
-		if (m_Unique)
-		{
-			--m_Sharing;
-			return false;
-		}
-		return true;
-	}
-
-	inline bool tryLockShared() noexcept
-	{
-		return try_lock_shared();
-	}
-
-	inline void lock_shared() noexcept
-	{
-		++m_Sharing;
-		while (m_Unique)
-		{
-			--m_Sharing;
-			while (m_Unique)
-				std::this_thread::yield();
-			++m_Sharing;
-		}
-	}
-
-	inline void lockShared() noexcept
-	{
-		lock_shared();
-	}
-
-	inline void unlock_shared() noexcept
-	{
-		--m_Sharing;
-	}
-
-	inline void unlockShared() noexcept
-	{
-		unlock_shared();
-	}
-
-private:
-	std::atomic_bool m_Unique;
-	std::atomic_int m_Sharing;
-
-private:
-	AtomicSharedMutex &operator=(const AtomicSharedMutex&) = delete;
-	AtomicSharedMutex(const AtomicSharedMutex&) = delete;
-
-}; /* class AtomicSharedMutex */
-#endif
 
 } /* namespace sev */
 
