@@ -133,7 +133,7 @@ public:
 		return TFunctor(m_Vt, m_Ptr, false);
 	}
 
-	inline void extract(const TVt *&vt, void *&ptr, bool &movable, bool forward = false)
+	inline void extract(const TVt *&vt, void *&ptr, bool &movable, bool forward = false) noexcept
 	{
 		movable = m_Movable && forward;
 		vt = m_Vt;
@@ -145,7 +145,7 @@ public:
 		}
 	}
 
-	inline void extract(const TVt *&vt, const void *&ptr) const // Movable is always false in this case, only copyable
+	inline void extract(const TVt *&vt, const void *&ptr) const noexcept // Movable is always false in this case, only copyable
 	{
 		vt = m_Vt;
 		ptr = m_Ptr;
@@ -156,22 +156,22 @@ public:
 		return m_Vt->invoke(m_Ptr, value...);
 	}
 
-	inline bool movable() const
+	inline bool movable() const noexcept
 	{
 		return m_Movable;
 	}
 
-	inline void *ptr()
+	inline void *ptr() noexcept
 	{
 		return m_Ptr;
 	}
 
-	inline const void *ptr() const
+	inline const void *ptr() const noexcept
 	{
 		return m_Ptr;
 	}
 
-	inline const TVt *vt() const
+	inline const TVt *vt() const noexcept
 	{
 		return m_Vt;
 	}

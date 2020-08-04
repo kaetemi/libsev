@@ -133,6 +133,32 @@ public:
 		ExceptionHandle::rethrow(SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor));
 	}
 
+	inline errno_t push(nothrow_t, const FunctorView<TRes(TArgs...)> &fv) noexcept
+	{
+		const FunctorVt<TRes(TArgs...)> *vt;
+		void *ptr;
+		fv.extract(vt, ptr);
+		return SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->ConstCopyConstructor);
+	}
+
+	inline errno_t push(nothrow_t, FunctorView<TRes(TArgs...)> &fv) noexcept
+	{
+		const FunctorVt<TRes(TArgs...)> *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, false);
+		return SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor);
+	}
+
+	inline errno_t push(nothrow_t, FunctorView<TRes(TArgs...)> &&fv) noexcept
+	{
+		const FunctorVt<TRes(TArgs...)> *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		return EV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor);
+	}
+
 protected:
 	SEV_ConcurrentFunctorQueue m;
 
