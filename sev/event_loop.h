@@ -52,13 +52,13 @@ struct SEV_EventLoopVt
 {
 	void(*Destroy)(SEV_EventLoop *el);
 
-	errno_t(*Post)(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-	errno_t(*Invoke)(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-	errno_t(*Timeout)(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
-	errno_t(*Interval)(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+	errno_t(*Post)(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size);
+	void(*Invoke)(SEV_EventLoop *el, SEV_ExceptionHandle *eh, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr);
+	errno_t(*Timeout)(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int timeoutMs);
+	errno_t(*Interval)(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int intervalMs);
 
 	errno_t(*PostFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
-	errno_t(*InvokeFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+	void(*InvokeFunctor)(SEV_EventLoop *el, SEV_ExceptionHandle *eh, const SEV_FunctorVt *vt, void *ptr);
 	errno_t(*TimeoutFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs);
 	errno_t(*IntervalFunctor)(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
@@ -80,13 +80,13 @@ static_assert(sizeof(SEV_EventLoopVt) == 32 * sizeof(void *));
 // Interface
 SEV_LIB void SEV_EventLoop_destroy(SEV_EventLoop *el);
 
-SEV_LIB errno_t SEV_EventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size); // Post functions failure is most likely ENOMEM, no other known errors
-SEV_LIB errno_t SEV_EventLoop_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-SEV_LIB errno_t SEV_EventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
-SEV_LIB errno_t SEV_EventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+SEV_LIB errno_t SEV_EventLoop_post(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size); // Post functions failure is most likely ENOMEM, no other known errors. ptr is copied to the queue
+SEV_LIB void SEV_EventLoop_invoke(SEV_EventLoop *el, SEV_ExceptionHandle *eh, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr); // TODO: Cast down eh
+SEV_LIB errno_t SEV_EventLoop_timeout(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int timeoutMs);
+SEV_LIB errno_t SEV_EventLoop_interval(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int intervalMs);
 
 SEV_LIB errno_t SEV_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
-SEV_LIB errno_t SEV_EventLoop_invokeFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+SEV_LIB void SEV_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh, const SEV_FunctorVt *vt, void *ptr); // TODO: Cast down eh
 SEV_LIB errno_t SEV_EventLoop_timeoutFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int timeoutMs);
 SEV_LIB errno_t SEV_EventLoop_intervalFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other), int intervalMs);
 
@@ -94,19 +94,20 @@ SEV_LIB void SEV_EventLoop_cancel(SEV_EventLoop *el);
 SEV_LIB errno_t SEV_EventLoop_join(SEV_EventLoop *el, bool empty);
 
 SEV_LIB void SEV_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
-SEV_LIB void SEV_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh);
+SEV_LIB void SEV_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh); // TODO: Cast down eh
 SEV_LIB void SEV_EventLoop_stop(SEV_EventLoop *el);
 
 // Generic implementations, work with all event loops
-SEV_LIB errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-SEV_LIB errno_t SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size);
-SEV_LIB errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs);
-SEV_LIB errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size);
+SEV_LIB void SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, SEV_ExceptionHandle *eh, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int timeoutMs);
+SEV_LIB errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int intervalMs);
 
 SEV_LIB SEV_EventLoop *SEV_EventLoop_create();
 SEV_LIB void SEV_IMPL_EventLoop_destroy(SEV_EventLoop *el);
 
 SEV_LIB errno_t SEV_IMPL_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
+SEV_LIB void SEV_IMPL_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other));
 
 #ifdef __cplusplus
 }
@@ -115,9 +116,9 @@ SEV_LIB errno_t SEV_IMPL_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_Func
 #ifdef __cplusplus
 namespace sev {
 typedef SEV_EventLoop EventLoop;
-typedef FunctorVt<void(EventLoop &el)> EventFunctorVt;
-typedef Functor<void(EventLoop &el)> EventFunctor;
-typedef FunctorView<void(EventLoop &el) > EventFunctorView;
+typedef FunctorVt<errno_t(EventLoop &el)> EventFunctorVt;
+typedef Functor<errno_t(EventLoop &el)> EventFunctor;
+typedef FunctorView<errno_t(EventLoop &el) > EventFunctorView;
 }
 #endif
 
