@@ -53,13 +53,6 @@ struct SEV_FunctorVt
 
 };
 
-SEV_LIB extern ptrdiff_t SEV_BadAlloc;
-SEV_LIB extern ptrdiff_t SEV_BadFunctionCall;
-SEV_LIB extern ptrdiff_t SEV_BadException;
-#define SEV_BadAlloc (&SEV_BadAlloc)
-#define SEV_BadFunctionCall (&SEV_BadFunctionCall)
-#define SEV_BadException (&SEV_BadException)
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

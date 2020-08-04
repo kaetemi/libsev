@@ -29,13 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "functor.h"
 
-#undef SEV_BadAlloc
-#undef SEV_BadFunctionCall
-#undef SEV_BadException
-ptrdiff_t SEV_BadAlloc;
-ptrdiff_t SEV_BadFunctionCall;
-ptrdiff_t SEV_BadException;
-
 void *SEV_alignedMAlloc(ptrdiff_t size, size_t alignment)
 {
 	return _aligned_malloc(size, alignment);
