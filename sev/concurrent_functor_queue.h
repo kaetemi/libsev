@@ -112,8 +112,7 @@ public:
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
 		fv.extract(vt, ptr);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->ConstCopyConstructor))
-			throw std::bad_alloc();
+		ExceptionHandle::rethrow(SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->ConstCopyConstructor));
 	}
 
 	inline void push(FunctorView<TRes(TArgs...)> &fv)
@@ -122,8 +121,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor))
-			throw std::bad_alloc();
+		ExceptionHandle::rethrow(SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor));
 	}
 
 	inline void push(FunctorView<TRes(TArgs...)> &&fv)
@@ -132,8 +130,7 @@ public:
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, true);
-		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor))
-			throw std::bad_alloc();
+		ExceptionHandle::rethrow(SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor));
 	}
 
 protected:

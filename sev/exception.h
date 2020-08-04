@@ -153,6 +153,16 @@ public:
 		}
 	}
 
+	static SEV_FORCE_INLINE void rethrow(errno_t eno)
+	{
+		if (eno)
+		{
+			ExceptionHandle eh;
+			eh.capture(eno);
+			eh.rethrow();
+		}
+	}
+
 	SEV_FORCE_INLINE errno_t rethrow(std::nothrow_t) noexcept
 	{
 		errno_t eno = SEV_Exception_rethrow(eh);
