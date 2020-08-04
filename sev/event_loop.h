@@ -159,38 +159,29 @@ namespace sev {
 
 
 #if 0
-enum class TEventLoop
-{
-	Generic,
-	Win32,
 
-};
-
-typedef FunctorView<void(IEventLoop &el)> EventFunctorView; 
-typedef Functor<void(IEventLoop &el)> EventFunctor;
-
-class IEventLoop
+class EventLoop
 {
 public:
-	static SEV_FORCE_INLINE IEventLoop *create(TEventLoop type)
+	static SEV_FORCE_INLINE EventLoop *create()
 	{
-		if (type == TEventLoop::Generic)
-		{
-			IEventLoop *el = SEV_EventLoop_create();
-			if (!el)
-				throw std::bad_alloc();
-			return el;
-		}
-		else
-		{
-			throw std::exception();
-		}
+		EventLoop *el = (EventLoop *)SEV_EventLoop_create();
+		if (!el)
+			throw std::bad_alloc();
+		return el;
 	}
 
-	SEV_FORCE_INLINE IEventLoop() { }
-	SEV_FORCE_INLINE virtual ~IEventLoop() noexcept { }
+	static SEV_FORCE_INLINE EventLoop *create(nothrow_t)
+	{
+		return (EventLoop *)SEV_EventLoop_create();
+	}
+
+	SEV_FORCE_INLINE void destroy() // delete
+	{
+		SEV_EventLoop_destroy(this);
+	}
 	
-	SEV_FORCE_INLINE virtual void post(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+	SEV_FORCE_INLINE void post(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
 	{
 		errno_t err = SEV_EventLoop_post(this, f, capture, size);
 		if (!err) return;
@@ -198,7 +189,7 @@ public:
 		throw std::exception();
 	}
 
-	SEV_FORCE_INLINE virtual void invoke(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+	SEV_FORCE_INLINE void invoke(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture)
 	{
 		errno_t err = SEV_EventLoop_invoke(this, f, capture, size);
 		if (!err) return;
@@ -206,7 +197,7 @@ public:
 		throw std::exception();
 	}
 
-	SEV_FORCE_INLINE virtual void timeout(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+	SEV_FORCE_INLINE void timeout(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
 	{
 		errno_t err = SEV_EventLoop_timeout(this, f, capture, size, timeoutMs);
 		if (!err) return;
@@ -214,7 +205,7 @@ public:
 		throw std::exception();
 	}
 
-	SEV_FORCE_INLINE virtual void interval(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+	SEV_FORCE_INLINE void interval(errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
 	{
 		errno_t err = SEV_EventLoop_interval(this, f, capture, size, intervalMs);
 		if (!err) return;
@@ -222,13 +213,13 @@ public:
 		throw std::exception();
 	}
 	
-	virtual void post(EventFunctorView &&f) = 0;
-	virtual void invoke(EventFunctorView &&f) = 0;
-	virtual void timeout(EventFunctorView &&f, int timeoutMs) = 0;
-	virtual void interval(EventFunctorView &&f, int intervalMs)  = 0;
+	SEV_FORCE_INLINE void post(EventFunctorView &&f) = 0;
+	SEV_FORCE_INLINE void invoke(EventFunctorView &&f) = 0;
+	SEV_FORCE_INLINE void timeout(EventFunctorView &&f, int timeoutMs) = 0;
+	SEV_FORCE_INLINE void interval(EventFunctorView &&f, int intervalMs)  = 0;
 
-	virtual void loop() = 0;
-	virtual void run() = 0;
+	SEV_FORCE_INLINE void loop() = 0;
+	SEV_FORCE_INLINE void run() = 0;
 
 	SEV_FORCE_INLINE IEventLoop(const IEventLoop &other) = delete;
 	SEV_FORCE_INLINE IEventLoop &operator=(const IEventLoop &other) = delete;
@@ -244,52 +235,6 @@ public:
 class SEV_LIB IEventLoop
 {
 public:
-	virtual ~IEventLoop() noexcept;
-
-	//! Number of threads processing this event loop
-	virtual int threads() = 0;
-
-	//! Call from inside an interval function to prevent it from being called again
-	virtual void cancel() = 0;
-
-	//! Block call until the currently queued functions finished processing. Set empty flag to keep waiting until the queue is completely empty
-	virtual void join(bool empty = false) = 0; // thread-safe
-
-	//! Post a function, return immediately
-	virtual void post(const EventFunctorView &f) = 0;
-	virtual void post(EventFunctorView &&f) = 0;
-
-	/*
-	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to) = 0;
-	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to) = 0;
-
-	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, const EventFunctorView &cb) = 0;
-	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, EventFunctorView &&cb) = 0;
-
-	virtual void post(const EventKernel &f, ptrdiff_t from, ptrdiff_t to, EventFunctorView &&cb) = 0;
-	virtual void post(EventKernel &&f, ptrdiff_t from, ptrdiff_t to, const EventFunctorView &cb) = 0;
-	*/
-
-	//! Post a function, block until processed
-	virtual void invoke(const EventFunctorView &f) = 0;
-	virtual void invoke(EventFunctorView &&f) = 0;
-
-	/*
-	virtual void invoke(const EventKernel &f, ptrdiff_t from, ptrdiff_t to) = 0;
-	virtual void invoke(EventKernel &&f, ptrdiff_t from, ptrdiff_t to) = 0;
-	*/
-
-	//! Post a function that will be called after a timeout (TODO: Return a handle to cancel?)
-	virtual void timeout(const EventFunctorView &f, int ms) = 0;
-	virtual void timeout(EventFunctorView &&f, int ms) = 0;
-
-	//! Post a function that will be called at an interval (TODO: Return a handle to cancel?)
-	virtual void interval(const EventFunctorView &f, int ms) = 0;
-	virtual void interval(EventFunctorView &&f, int ms) = 0;
-
-	void setCurrent(bool current = true);
-	bool current();
-
 	//! Run a function on a thread, and proces a callback afterwards
 	template<typename T>
 	void thread(T &&f, T &&cb)
@@ -430,31 +375,6 @@ public:
 class SEV_LIB EventLoop
 {
 public:
-	EventLoop();
-	virtual ~EventLoop() noexcept;
-
-	void run()
-	{
-		stop();
-		m_Running = true;
-		m_Thread = std::move(std::thread(&EventLoop::loop, this));
-	}
-
-	void runSync()
-	{
-		stop();
-		m_Running = true;
-		loop();
-	}
-
-	void stop() // thread-safe
-	{
-		m_Running = false;
-		poke();
-		if (m_Thread.joinable())
-			m_Thread.join();
-	}
-
 	void clear() // semi-thread-safe
 	{
 #ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
@@ -466,12 +386,6 @@ public:
 		m_Immediate = std::move(std::queue<EventFunctorView>());
 		m_Timeout = std::move(std::priority_queue<timeout_func>());
 #endif
-	}
-
-	//! Call from inside an interval function to prevent it from being called again
-	void cancel()
-	{
-		m_Cancel = true;
 	}
 
 	//! Block call until the queued functions  finished processing. Set empty to repeat the wait until the queue is empty
@@ -499,44 +413,6 @@ public:
 		};
 		immediate(syncFunc);
 		flag.wait();
-	}
-
-	/*
-private:
-	template<typename T>
-	inline void immediate_(T &&f) 
-	{
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-		m_ImmediateConcurrent.push(std::forward<T>(f));
-#else
-		std::unique_lock<AtomicMutex> lock(m_QueueLock);
-		m_Immediate.push(std::forward<T>(f));
-#endif
-		poke();
-	}
-
-public:
-	inline void immediate(const EventFunctorView &f) // thread-safe
-	{
-		immediate_(f);
-	}
-
-	void immediate(EventFunctorView &&f) // thread-safe
-	{
-		immediate_(f);
-	}
-	*/
-
-	template<typename T = EventFunctorView>
-	inline void immediate(T &&f)
-	{
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-		m_ImmediateConcurrent.push(std::forward<EventFunctorView>(f));
-#else
-		std::unique_lock<AtomicMutex> lock(m_QueueLock);
-		m_Immediate.push(std::forward<EventFunctorView>(f));
-#endif
-		poke();
 	}
 
 	template<class rep, class period, typename T = EventFunctorView>
@@ -575,39 +451,6 @@ public:
 		poke();
 	}
 
-	template<typename T = EventFunctorView>
-	void timed(T &&f, const std::chrono::steady_clock::time_point &point) // thread-safe
-	{
-		timeout_func tf;
-		tf.f = std::forward<EventFunctorView>(f);
-		tf.time = point;
-		tf.interval = std::chrono::steady_clock::duration::zero();
-		; {
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			m_TimeoutConcurrent.push(std::move(tf));
-#else
-			std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
-			m_Timeout.push(std::move(tf));
-#endif
-		}
-		poke();
-	}
-
-public:
-	template<typename T = EventFunctorView>
-	void thread(T &&f, T &&callback)
-	{
-		std::thread t([this, f = std::forward(f), callback = std::forward(f)]() mutable -> void {
-			f();
-			immediate(std::move(callback));
-		});
-		t.detach();
-	}
-
-private:
-	void loop();
-	inline void poke() { m_Flag.set(); }
-
 private:
 	struct timeout_func
 	{
@@ -621,22 +464,6 @@ private:
 		}
 
 	};
-
-private:
-	bool m_Running;
-	std::thread m_Thread;
-	EventFlag m_Flag;
-
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-	concurrency::concurrent_queue<EventFunctor> m_ImmediateConcurrent;
-	concurrency::concurrent_priority_queue<timeout_func> m_TimeoutConcurrent;
-#else
-	AtomicMutex m_QueueLock;
-	std::queue<EventFunctorView> m_Immediate;
-	AtomicMutex m_QueueTimeoutLock;
-	std::priority_queue<timeout_func> m_Timeout;
-#endif
-	bool m_Cancel;
 
 }; /* class EventLoop */
 

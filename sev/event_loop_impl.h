@@ -113,7 +113,7 @@ public:
 #ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
 	concurrency::concurrent_priority_queue<TimeoutFunctor> TimeoutConcurrent;
 #else
-	AtomicMutex TimeoutMutex;
+	std::mutex TimeoutMutex;
 	std::priority_queue<TimeoutFunctor> Timeout;
 #endif
 

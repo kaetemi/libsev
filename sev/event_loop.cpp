@@ -143,7 +143,7 @@ void SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, SEV_ExceptionHandle *eh, e
 		fv.extract(vt, ptr, movable, false);
 		SEV_ASSERT(!movable);
 		el->Vt->InvokeFunctor(el, eh, vt->get(), ptr);
-	});
+		});
 }
 
 errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int timeoutMs)
@@ -249,6 +249,7 @@ SEV_EventLoop *SEV_EventLoop_create()
 
 void SEV_IMPL_EventLoop_destroy(SEV_EventLoop *el)
 {
+	el->Vt->Stop(el);
 	delete el;
 }
 
@@ -275,7 +276,7 @@ void SEV_IMPL_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh
 		if (!*eh && res) *eh = SEV_Exception_capture(res);
 		flag.set();
 		return SEV_ESUCCESS;
-	});
+		});
 	if (eno)
 	{
 		--elp->QueueItems;
@@ -308,12 +309,12 @@ errno_t SEV_IMPL_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, 
 					if (ehc.raised())
 					{
 						ehc.discard();
-						SEV_terminate(); // Ok, bye. Don't throw in the exception handler.
+						SEV_terminate(); // Ok, bye. Don't throw in the exception handler. Unhandled exception.
 					}
 				}
 			}
 		})));
-	});
+		});
 	return ehr.rethrow(nothrow);
 }
 
@@ -338,10 +339,74 @@ void SEV_IMPL_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh)
 			do
 			{
 				errno_t eno = elp->Queue.tryCallAndPop(*(sev::ExceptionHandle *)eh, success, *elp);
+				if (success) --elp->QueueItems;
 				if (!*eh && eno) *eh = SEV_Exception_capture(eno);
 			} while (success && !*eh); // Popped a function and no errors
 			if (*eh) break; // Break out of loop due to error!
 		}
+
+		// Check timer queue. Temporary, recycled code.
+		// TODO: It might be better (more generic) to put the timer queue onto a separate thread, and simply post to the event loop.
+		((sev::ExceptionHandle *)eh)->capture<void>([&]() -> void {
+			for (;;)
+			{
+#ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
+				sev::impl::el::TimeoutFunctor tf;
+				if (!elp->TimeoutConcurrent.try_pop(tf))
+					break;
+				const sev::impl::el::TimeoutFunctor &tfr = tf;
+#else
+				elp->TimeoutMutex.lock();
+				if (!elp->Timeout.size())
+				{
+					elp->TimeoutMutex.unlock();
+					break;
+				}
+				const sev::impl::el::TimeoutFunctor &tfr = elp->Timeout.top();
+#endif
+				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+				int64_t wt = std::chrono::duration_cast<std::chrono::milliseconds>(tfr.Time - now).count();
+				if (tfr.Time > now) // Wait
+				{
+#ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
+					elp->TimeoutConcurrent.push(tf);
+#else
+					elp->TimeoutMutex.unlock();
+#endif
+					++elp->ThreadsWaiting;
+					elp->Flag.wait(wt & 0xFFFF); // Mask to 65 seconds, it's fine to break out earlier, the loop re-checks
+					--elp->ThreadsWaiting;
+					if (elp->QueueItems > 1 && elp->ThreadsWaiting > 1)
+						elp->Flag.set(); // Wake up more threads if there's more than one item in the queue
+					break;
+				}
+#ifndef SEV_EVENT_LOOP_MSVC_CONCURRENT
+				sev::impl::el::TimeoutFunctor tf = tfr;
+				elp->Timeout.pop();
+				elp->TimeoutMutex.unlock();
+#endif
+				errno_t eno = tf.Functor(*(sev::ExceptionHandle *)eh, *elp);
+				bool cancel = eno == ECANCELED;
+				if (!*eh && eno && eno != ECANCELED) *eh = SEV_Exception_capture(eno);
+				--elp->QueueItems;
+				if (!cancel && (tf.Interval > std::chrono::nanoseconds::zero())) // repeat
+				{
+					tf.Time += tf.Interval;
+					;
+					{
+#ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
+						elp->TimeoutConcurrent.push(std::move(tf));
+						++elp->QueueItems;
+#else
+						std::unique_lock<std::mutex> lock(elp->TimeoutMutex);
+						elp->Timeout.push(std::move(tf));
+#endif
+					}
+				}
+				if (*eh) break; // Break out of loop due to error!
+			}
+		});
+		if (*eh) break; // Break out of loop due to error!
 
 		// Wait
 		++elp->ThreadsWaiting;
@@ -387,150 +452,5 @@ void SEV_IMPL_EventLoop_stop(SEV_EventLoop *el)
 		elp->Stopping = false;
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-namespace sev {
-
-#if 0
-
-namespace {
-
-thread_local IEventLoop *l_EventLoop;
-
-}
-
-IEventLoop::~IEventLoop() noexcept
-{
-
-}
-
-void IEventLoop::setCurrent(bool current)
-{
-	l_EventLoop = current ? this : null;
-}
-
-bool IEventLoop::current()
-{
-	return l_EventLoop == this;
-}
-
-EventLoop::EventLoop() : m_Running(false), m_Cancel(false)
-{
-	
-}
-
-EventLoop::~EventLoop() noexcept
-{
-	stop();
-	clear();
-}
-
-void EventLoop::loop()
-{
-	while (m_Running)
-	{
-		for (;;)
-		{
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			EventFunctor f;
-			if (!m_ImmediateConcurrent.try_pop(f))
-				break;
-#else
-			m_QueueLock.lock();
-			if (!m_Immediate.size())
-			{
-				m_QueueLock.unlock();
-				break;
-			}
-			EventFunctor f = m_Immediate.front();
-			m_Immediate.pop();
-			m_QueueLock.unlock();
-#endif
-			f(*this);
-		}
-
-		bool poked = false;
-		for (;;)
-		{
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			timeout_func tf;
-			if (!m_TimeoutConcurrent.try_pop(tf))
-				break;
-			const timeout_func &tfr = tf;
-#else
-			m_QueueTimeoutLock.lock();
-			if (!m_Timeout.size())
-			{
-				m_QueueTimeoutLock.unlock();
-				break;
-			}
-			const timeout_func &tfr = m_Timeout.top();
-#endif
-			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-			int64_t wt = std::chrono::duration_cast<std::chrono::milliseconds>(tfr.time - now).count();
-			if (tfr.time > now) // Wait
-			{
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-				m_TimeoutConcurrent.push(tf);
-#else
-				m_QueueTimeoutLock.unlock();
-#endif
-				m_Flag.wait(wt & 0xFFFF); // Mask to 65 seconds, it's fine to break out earlier, the loop re-checks
-				poked = true;
-				break;
-			}
-#ifndef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-			timeout_func tf = tfr;
-			m_Timeout.pop();
-			m_QueueTimeoutLock.unlock();
-#endif
-			m_Cancel = false;
-			tf.f(*this); // call
-			if (!m_Cancel && (tf.interval > std::chrono::nanoseconds::zero())) // repeat
-			{
-				tf.time += tf.interval;
-				; {
-#ifdef SEV_EVENT_LOOP_CONCURRENT_QUEUE
-					m_TimeoutConcurrent.push(std::move(tf));
-#else
-					std::unique_lock<AtomicMutex> lock(m_QueueTimeoutLock);
-					m_Timeout.push(std::move(tf));
-#endif
-				}
-			}
-		}
-
-		if (!poked)
-		{
-			m_Flag.wait();
-		}
-	}
-}
-
-} /* namespace sev */
-
-namespace sev {
-
-namespace /* anonymous */ {
-
-void test()
-{
-	
-}
-
-} /* anonymous namespace */
-
-#endif
-
-} /* namespace sev */
 
 /* end of file */
