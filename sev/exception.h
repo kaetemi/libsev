@@ -77,7 +77,7 @@ SEV_LIB void SEV_Exception_discardEx(SEV_ExceptionHandle eh); // Releases intern
 
 namespace sev {
 
-namespace impl {
+namespace impl::ex {
 
 constexpr void *rethrower() { return __ExceptionPtrRethrow; }
 
@@ -121,7 +121,7 @@ public:
 		errno_t eno;
 		SEV_Exception_extractEx(eh, &exception, &what, &destroy, &rethrower, &eno);
 		auto fin = gsl::finally([this]() -> void { discard(); }); // Release when throwing!
-		if (rethrower == impl::rethrower())
+		if (rethrower == impl::ex::rethrower())
 		{
 			// Same standard library, we can rethrow this as-is!
 			std::exception_ptr ep = *(std::exception_ptr *)exception;
@@ -232,7 +232,7 @@ private:
 		auto destroy = [](void *exception) {
 			delete exception;
 		};
-		eh = SEV_Exception_captureEx(exception, what, destroy, impl::rethrower(), eno);
+		eh = SEV_Exception_captureEx(exception, what, destroy, impl::ex::rethrower(), eno);
 	}
 
 	TExceptionHandle eh;
@@ -241,7 +241,7 @@ private:
 
 }
 
-using ExceptionHandle = impl::ExceptionHandle<SEV_ExceptionHandle>;
+using ExceptionHandle = impl::ex::ExceptionHandle<SEV_ExceptionHandle>;
 
 }
 

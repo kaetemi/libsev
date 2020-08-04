@@ -95,10 +95,12 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 
 namespace sev {
 
-template<class TFn>
-struct ConcurrentFunctorQueue;
+namespace impl::q {
+
+// template<class TFn>
+// struct ConcurrentFunctorQueue;
 template<class TRes, class... TArgs>
-struct ConcurrentFunctorQueue<TRes(TArgs...)>
+struct ConcurrentFunctorQueue
 {
 public:
 	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) { if (SEV_ConcurrentFunctorQueue_init(&m, blockSize)) throw std::bad_alloc(); }
@@ -123,7 +125,7 @@ public:
 		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor))
 			throw std::bad_alloc();
 	}
-	
+
 	inline void push(FunctorView<TRes(TArgs...)> &&fv)
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
@@ -133,6 +135,30 @@ public:
 		if (SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor))
 			throw std::bad_alloc();
 	}
+
+protected:
+	SEV_ConcurrentFunctorQueue m;
+
+public:
+	ConcurrentFunctorQueue(const ConcurrentFunctorQueue &) = delete;
+	ConcurrentFunctorQueue(ConcurrentFunctorQueue &&) = delete;
+
+	ConcurrentFunctorQueue &operator= (const ConcurrentFunctorQueue &) = delete;
+	ConcurrentFunctorQueue &operator= (ConcurrentFunctorQueue &&) = delete;
+
+};
+
+}
+
+template<class TFn>
+struct ConcurrentFunctorQueue;
+
+template<class TRes, class... TArgs>
+struct ConcurrentFunctorQueue<TRes(TArgs...)> : public impl::q::ConcurrentFunctorQueue<TRes, TArgs...>
+{
+public:
+	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) : impl::q::ConcurrentFunctorQueue<TRes, TArgs...>(blockSize) { }
+	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<TRes, TArgs...>(nothrow, blockSize) { }
 
 	inline TRes tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
 	{
@@ -157,56 +183,66 @@ public:
 		return res;
 	}
 
-#if 0
-	inline TRes tryCallAndPop(void *&err, bool &success, TArgs... args) noexcept
-	{
-		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
-		TRes res;
-		const SEV_FunctorVt *rvt = null;
-		auto invokeData = [=, &err, &res, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
-			typedef FunctorVt<TRes(TArgs...)>::TInvokeCatch TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
-			rvt = vt;
-			res = ((TFn)vt->InvokeCatch)(ptr, &err, args...);
-			return err ? EOTHER : 0;
-		};
-		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
-		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
-		static const TInvoke invokeCall = (TInvoke)wrapvt.get()->Invoke;
-		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
-		success = rvt;
-		if (!err && ec) err = SEV_BadException;
-		return res;
-	}
-#endif
-
 	inline TRes tryCallAndPop(bool &success, TArgs... args)
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		TRes res = tryCallAndPop(eh, success, args...);
-		eh.rethrow();
-		return res;
+		auto fin = gsl::finally([&]() -> void { eh.rethrow(); });
+		return tryCallAndPop(eh, success, args...);
 	}
 
 	inline TRes tryCallAndPop(errno_t &eno, bool &success, TArgs... args) noexcept
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		TRes res = tryCallAndPop(eh, success, args...);
-		eno = eh.rethrow(nothrow);
-		return res;
+		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(nothrow); });
+		return tryCallAndPop(eh, success, args...);
 	}
-	
-private:
-	SEV_ConcurrentFunctorQueue m;
+};
 
+template<class... TArgs>
+struct ConcurrentFunctorQueue<void(TArgs...)> : public impl::q::ConcurrentFunctorQueue<void, TArgs...>
+{
 public:
-	ConcurrentFunctorQueue(const ConcurrentFunctorQueue &) = delete;
-	ConcurrentFunctorQueue(ConcurrentFunctorQueue &&) = delete;
+	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) : impl::q::ConcurrentFunctorQueue<void, TArgs...>(blockSize) { }
+	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<void, TArgs...>(nothrow, blockSize) { }
 
-	ConcurrentFunctorQueue& operator= (const ConcurrentFunctorQueue &) = delete;
-	ConcurrentFunctorQueue& operator= (ConcurrentFunctorQueue &&) = delete;
-	
+	inline void tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
+	{
+		const SEV_FunctorVt *rvt = null;
+		auto invokeData = [=, &eh, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
+			typedef FunctorVt<void(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
+			rvt = vt;
+			((TFn)vt->TryInvoke)(ptr, eh, args...);
+			return !eh.raised() ? eh.errNo() : SEV_ESUCCESS;
+		};
+		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
+		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
+		static const TInvoke invokeCall = (TInvoke)wrapvt.get()->Invoke;
+		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
+		success = rvt;
+		if (!eh.raised() && ec)
+		{
+			if (success) eh.capture(ec);
+			else if (ec != ENODATA) eh.capture(ec);
+		}
+	}
+
+	inline void tryCallAndPop(bool &success, TArgs... args)
+	{
+		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
+		ExceptionHandle eh;
+		auto fin = gsl::finally([&]() -> void { eh.rethrow(); });
+		tryCallAndPop(eh, success, args...);
+	}
+
+	inline void tryCallAndPop(errno_t &eno, bool &success, TArgs... args) noexcept
+	{
+		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
+		ExceptionHandle eh;
+		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(nothrow); });
+		tryCallAndPop(eh, success, args...);
+	}
 };
 
 }

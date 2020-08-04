@@ -165,6 +165,22 @@ int main()
 		}
 	}
 	{
+		sev::ConcurrentFunctorQueue<void()> q;
+		q.push([]() -> void {
+			throw std::invalid_argument("Exception from queue caught successfully!");
+		});
+		try
+		{
+			bool success;
+			std::cout << "Exception should follow:" << std::endl;
+			q.tryCallAndPop(success);
+		}
+		catch (const std::invalid_argument &ex)
+		{
+			std::cout << ex.what() << std::endl;
+		}
+	}
+	{
 		ptrdiff_t z = s_AllocationCount;
 		std::cout << "Local allocation count: "sv << z << "\n"sv;
 	}
