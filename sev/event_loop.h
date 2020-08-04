@@ -69,7 +69,7 @@ struct SEV_EventLoopVt
 	void(*Loop)(SEV_EventLoop *el, SEV_ExceptionHandle *eh);
 	void(*Stop)(SEV_EventLoop *el);
 
-	ptrdiff_t Reserved[32 - 14];
+	ptrdiff_t Reserved[32 - 13];
 
 };
 

@@ -35,7 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*
 
-Exception magic to transcend C library boundaries, and compiler differences!
+Exception magic to transcend C interface boundaries, and C++ compiler differences!
 
 */
 

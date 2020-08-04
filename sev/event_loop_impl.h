@@ -43,6 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <map>
 
 #ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
 #include <concurrent_priority_queue.h>
@@ -67,15 +68,23 @@ struct TimeoutFunctor
 
 };
 
-class EventLoop : public SEV_EventLoop
+#if 0 // TODO
+struct TimeoutFunctorWin32
+{
+	EventFunctor Functor; // Return ECANCELED to stop an interval
+	bool Interval;
+
+};
+#endif
+
+class EventLoopBase : public SEV_EventLoop
 {
 public:
-	EventLoop() : SEV_EventLoop{ &EventLoopVt }, QueueItems(0), Running(false), Threads(0), ThreadsWaiting(0), Stopping(false)
+	EventLoopBase(SEV_EventLoopVt *vt) : SEV_EventLoop{ vt }, QueueItems(0), Running(false), Threads(0), ThreadsWaiting(0), Stopping(false)
 	{
 
 	}
 
-	EventFlag Flag;
 	ConcurrentFunctorQueue<errno_t(EventLoop &)> Queue;
 	std::atomic_int QueueItems;
 	std::atomic_bool Running;
@@ -87,17 +96,42 @@ public:
 	std::atomic_bool Stopping;
 	EventFlag LoopEndedFlag;
 
+	EventLoopBase(const EventLoop &) = delete;
+	EventLoopBase(EventLoop &&) = delete;
+
+};
+
+class EventLoop : public EventLoopBase
+{
+public:
+	EventLoop() : EventLoopBase(&EventLoopVt)
+	{
+	}
+
+	EventFlag Flag;
+
 #ifdef SEV_EVENT_LOOP_MSVC_CONCURRENT
 	concurrency::concurrent_priority_queue<TimeoutFunctor> TimeoutConcurrent;
 #else
-	AtomicMutex m_QueueTimeoutLock;
-	std::priority_queue<TimeoutFunctor> m_Timeout;
+	AtomicMutex TimeoutMutex;
+	std::priority_queue<TimeoutFunctor> Timeout;
 #endif
 
-	EventLoop(const EventLoop &) = delete;
-	EventLoop(EventLoop &&) = delete;
+};
+
+#if 0 // TODO
+class EventLoopWin32 : public EventLoopBase
+{
+public:
+	EventLoopWin32() : EventLoopBase(&EventLoopVt) // TODO
+	{
+	}
+
+	std::mutex TimeoutMutex;
+	std::map<INT_PTR, TimeoutFunctorWin32> TimeoutMap; // INT_PTR timerId = SetTimer
 
 };
+#endif
 
 }
 
