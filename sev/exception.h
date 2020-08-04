@@ -86,7 +86,7 @@ template<typename TExceptionHandle>
 class ExceptionHandle
 {
 public:
-	SEV_FORCE_INLINE ExceptionHandle(SEV_ExceptionHandle e) : eh(e)
+	SEV_FORCE_INLINE ExceptionHandle(SEV_ExceptionHandle e) noexcept : eh(e)
 	{
 		// no-op
 	}

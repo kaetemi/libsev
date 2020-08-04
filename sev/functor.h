@@ -120,11 +120,16 @@ public:
 		return m_Vt->invoke(p_ptr(), value...);
 	}
 
+	inline TRes operator()(ExceptionHandle &eh, TArgs... value)
+	{
+		return m_Vt->invoke(p_ptr(), eh, value...);
+	}
+
 	inline Functor(const Functor &other)
 	{
 		m_Vt = other.m_Vt;
 		void *ptr = p_allocPtr(m_Vt->size()); // Allocate space
-		m_Vt->copyConstructor(ptr, other.p_ptr());
+		m_Vt->copyConstructor(ptr, const_cast<void *>(other.p_ptr())); // FIXME: Const!!!!
 	}
 
 	inline Functor(Functor &other)

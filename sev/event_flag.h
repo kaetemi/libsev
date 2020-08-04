@@ -119,6 +119,11 @@ public:
 		}
 	}
 
+	SEV_FORCE_INLINE EventFlag(nothrow_t, bool manualReset = false, bool initialState = false) noexcept
+	{
+		errno_t err = SEV_EventFlag_init(&m, manualReset, initialState); // FIXME: ERrror
+	}
+
 	SEV_FORCE_INLINE ~EventFlag() noexcept
 	{
 		SEV_EventFlag_release(&m);

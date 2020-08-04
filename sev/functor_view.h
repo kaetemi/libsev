@@ -82,7 +82,7 @@ public:
 	{
 		static const auto vtable = TVt(fn);
 		m_Vt = &vtable;
-		m_Ptr = reinterpret_cast<void *>(&fn);
+		m_Ptr = reinterpret_cast<void *>(const_cast<TFn *>(&fn));
 		m_Movable = false;
 	}
 
@@ -91,7 +91,7 @@ public:
 	{
 		static const auto vtable = TVt(fn);
 		m_Vt = &vtable;
-		m_Ptr = reinterpret_cast<void *>(&fn);
+		m_Ptr = reinterpret_cast<void *>(const_cast<TFn *>(&fn));
 		m_Movable = true;
 	}
 

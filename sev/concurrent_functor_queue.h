@@ -189,7 +189,7 @@ public:
 	{
 		TRes res;
 		const SEV_FunctorVt *rvt = null;
-		auto invokeData = [=, &eh, &res, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
+		auto invokeData = [&](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
 			typedef FunctorVt<TRes(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
 			rvt = vt;
 			res = ((TFn)vt->TryInvoke)(ptr, eh, args...);
@@ -236,7 +236,7 @@ public:
 	inline void tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
 	{
 		const SEV_FunctorVt *rvt = null;
-		auto invokeData = [=, &eh, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
+		auto invokeData = [&](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
 			typedef FunctorVt<void(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
 			rvt = vt;
 			((TFn)vt->TryInvoke)(ptr, eh, args...);
