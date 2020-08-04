@@ -108,11 +108,12 @@ errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *ptr, SE
 	{
 		std::vector<uint8_t> v(size);
 		memcpy(&v[0], ptr, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> errno_t {
 			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
+			if (!err) return 0;
 			if (err == ENOMEM) throw std::bad_alloc();
 			throw std::exception();
+			return 0; // FIXME
 			});
 		const sev::EventFunctorVt *vt;
 		void *ptr;
@@ -134,33 +135,21 @@ errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *ptr, SE
 
 void SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, SEV_ExceptionHandle *eh, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr)
 {
-	// FIXME: This is all wrong :)
-
-	// Generic unoptimized wrapper
-	try
-	{
-		sev::EventFunctorView fv = std::move([f, ptr](sev::EventLoop &el) -> void {
+	((sev::ExceptionHandle *)eh)->capture<void>([=]() -> void {
+		sev::EventFunctorView fv = std::move([f, ptr](sev::EventLoop &el) -> errno_t {
 			errno_t err = f(ptr, &el);
-			if (!err) return;
+			if (!err) return 0;
 			if (err == ENOMEM) throw std::bad_alloc();
 			throw std::exception();
-		});
+			return 0; // FIXME
+			});
 		const sev::EventFunctorVt *vt;
 		void *ptr;
 		bool movable;
 		fv.extract(vt, ptr, movable, false);
 		SEV_ASSERT(!movable);
-		return el->Vt->InvokeFunctor(el, eh, vt->get(), ptr);
-	}
-	catch (std::bad_alloc)
-	{
-		//return ENOMEM;
-	}
-	catch (...)
-	{
-		//return EOTHER;
-	}
-	//return 0;
+		el->Vt->InvokeFunctor(el, eh, vt->get(), ptr);
+	});
 }
 
 errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *ptr, SEV_EventLoop *el), void *ptr, ptrdiff_t size, int timeoutMs)
@@ -170,11 +159,12 @@ errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *ptr,
 	{
 		std::vector<uint8_t> v(size);
 		memcpy(&v[0], ptr, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> errno_t {
 			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
+			if (!err) return 0;
 			if (err == ENOMEM) throw std::bad_alloc();
 			throw std::exception();
+			return 0; // FIXME
 			});
 		const sev::EventFunctorVt *vt;
 		void *ptr;
@@ -201,11 +191,12 @@ errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *ptr
 	{
 		std::vector<uint8_t> v(size);
 		memcpy(&v[0], ptr, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> errno_t {
 			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
+			if (!err) return 0;
 			if (err == ENOMEM) throw std::bad_alloc();
 			throw std::exception();
+			return 0; // FIXME
 			});
 		const sev::EventFunctorVt *vt;
 		void *ptr;
@@ -290,17 +281,20 @@ errno_t SEV_IMPL_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *v
 
 void SEV_IMPL_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh, const SEV_FunctorVt *vt, void *ptr)
 {
+	/*
 	// NOTE: Invoke catches any errors, and passes them down!
 	SEV_ASSERT(eh);
 	SEV_ASSERT(!*eh);
 	sev::impl::el::EventLoop *elp = (sev::impl::el::EventLoop *)el;
 	sev::EventFlag flag;
-	errno_t eno = elp->Queue.push(nothrow, [=, &flag]() -> void {
-		((sev::EventFunctorVt *)vt)->invoke(ptr, *(sev::ExceptionHandle *)eh, *(sev::EventLoop *)el);
+	errno_t eno = elp->Queue.push(nothrow, [=, &flag]() -> errno_t {
+		errno_t res = ((sev::EventFunctorVt *)vt)->invoke(ptr, *(sev::ExceptionHandle *)eh, *(sev::EventLoop *)el);
+		if (!*eh && res) SEV_Exception_capture(res);
 		flag.set();
 	});
 	if (eno) SEV_Exception_capture(eno);
 	flag.wait();
+	*/
 }
 
 

@@ -175,7 +175,7 @@ public:
 	inline void destroy(void *ptr) const { return m.Destroy(ptr); }
 
 	inline TRes invoke(void *ptr, TArgs... value) const { return ((TInvoke)m.Invoke)(ptr, value...); }
-	inline TRes invoke(void *ptr, ExceptionHandle &eh, TArgs... value) const { return ((TInvokeCatch)m.TryInvoke)(ptr, &eh, value...); }
+	inline TRes invoke(void *ptr, ExceptionHandle &eh, TArgs... value) const { return ((TTryInvoke)m.TryInvoke)(ptr, eh, value...); }
 
 private:
 	const SEV_FunctorVt m;
