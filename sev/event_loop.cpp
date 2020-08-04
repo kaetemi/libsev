@@ -28,11 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "event_loop.h"
-#include "concurrent_functor_queue.h"
-
-#include <mutex>
-#include <thread>
-#include <vector>
+#include "event_loop_impl.h"
 
 void SEV_EventLoop_destroy(SEV_EventLoop *el)
 {
@@ -219,7 +215,9 @@ errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *ptr
 	return 0;
 }
 
-static SEV_EventLoopVt s_EventLoopVt = {
+namespace sev::impl::el {
+
+SEV_EventLoopVt EventLoopVt = {
 	SEV_IMPL_EventLoop_destroy,
 
 	SEV_IMPL_EventLoopBase_post,
@@ -238,33 +236,6 @@ static SEV_EventLoopVt s_EventLoopVt = {
 	SEV_IMPL_EventLoop_run, // Run
 	SEV_IMPL_EventLoop_loop, // Loop
 	SEV_IMPL_EventLoop_stop, // Stop
-
-};
-
-namespace sev::impl::el {
-
-class EventLoop : public SEV_EventLoop
-{
-public:
-	EventLoop() : SEV_EventLoop{ &s_EventLoopVt }, Flag(), QueueItems(0), Running(false), Threads(0), ThreadsWaiting(0), Stopping(false), LoopEndedFlag()
-	{
-
-	}
-
-	EventFlag Flag;
-	ConcurrentFunctorQueue<errno_t(EventLoop &)> Queue;
-	std::atomic_int QueueItems;
-	std::atomic_bool Running;
-	std::atomic_int Threads;
-	std::atomic_int ThreadsWaiting;
-
-	std::mutex ManagedThreadsMutex;
-	std::vector<std::thread> ManagedThreads;
-	std::atomic_bool Stopping;
-	EventFlag LoopEndedFlag;
-
-	EventLoop(const EventLoop &) = delete;
-	EventLoop(EventLoop &&) = delete;
 
 };
 
