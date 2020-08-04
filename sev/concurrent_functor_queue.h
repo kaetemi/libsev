@@ -159,6 +159,8 @@ public:
 		return EV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor);
 	}
 
+	inline SEV_ConcurrentFunctorQueue *get() const noexcept { return &m; }
+
 protected:
 	SEV_ConcurrentFunctorQueue m;
 

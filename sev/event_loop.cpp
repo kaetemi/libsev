@@ -28,130 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "event_loop.h"
-
-errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
-{
-	// Generic unoptimized wrapper
-	try
-	{
-		std::vector<uint8_t> v(size);
-		memcpy(&v[0], capture, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
-			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
-			if (err == ENOMEM) throw std::bad_alloc();
-			throw std::exception();
-		});
-		const sev::EventFunctorVt *vt;
-		void *ptr;
-		bool movable;
-		fv.extract(vt, ptr, movable, true);
-		SEV_ASSERT(movable);
-		return el->Vt->PostFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
-}
-
-errno_t SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
-{
-	// Generic unoptimized wrapper
-	try
-	{
-		std::vector<uint8_t> v(size);
-		memcpy(&v[0], capture, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
-			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
-			if (err == ENOMEM) throw std::bad_alloc();
-			throw std::exception();
-		});
-		const sev::EventFunctorVt *vt;
-		void *ptr;
-		bool movable;
-		fv.extract(vt, ptr, movable, true);
-		SEV_ASSERT(movable);
-		return el->Vt->InvokeFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
-}
-
-errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
-{
-	// Generic unoptimized wrapper
-	try
-	{
-		std::vector<uint8_t> v(size);
-		memcpy(&v[0], capture, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
-			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
-			if (err == ENOMEM) throw std::bad_alloc();
-			throw std::exception();
-		});
-		const sev::EventFunctorVt *vt;
-		void *ptr;
-		bool movable;
-		fv.extract(vt, ptr, movable, true);
-		SEV_ASSERT(movable);
-		return el->Vt->TimeoutFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, timeoutMs);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
-}
-
-errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
-{
-	// Generic unoptimized wrapper
-	try
-	{
-		std::vector<uint8_t> v(size);
-		memcpy(&v[0], capture, size);
-		sev::EventFunctorView fv = std::move([f, v](sev::IEventLoop &el) -> void {
-			errno_t err = f((void *)&v[0], &el);
-			if (!err) return;
-			if (err == ENOMEM) throw std::bad_alloc();
-			throw std::exception();
-		});
-		const sev::EventFunctorVt *vt;
-		void *ptr;
-		bool movable;
-		fv.extract(vt, ptr, movable, true);
-		SEV_ASSERT(movable);
-		return el->Vt->IntervalFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, intervalMs);
-	}
-	catch (std::bad_alloc)
-	{
-		return ENOMEM;
-	}
-	catch (...)
-	{
-		return EOTHER;
-	}
-	return 0;
-}
+#include "concurrent_functor_queue.h"
 
 void SEV_EventLoop_destroy(SEV_EventLoop *el)
 {
@@ -213,9 +90,9 @@ void SEV_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, void *pt
 	el->Vt->Run(el, onError, ptr, forwardConstructor);
 }
 
-errno_t SEV_EventLoop_loop(SEV_EventLoop *el)
+void SEV_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh)
 {
-	return el->Vt->Loop(el);
+	el->Vt->Loop(el, eh);
 }
 
 void SEV_EventLoop_stop(SEV_EventLoop *el)
@@ -224,9 +101,192 @@ void SEV_EventLoop_stop(SEV_EventLoop *el)
 }
 
 
+errno_t SEV_IMPL_EventLoopBase_post(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+{
+	// Generic unoptimized wrapper
+	try
+	{
+		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+			});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->PostFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
 
+errno_t SEV_IMPL_EventLoopBase_invoke(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size)
+{
+	// Generic unoptimized wrapper
+	try
+	{
+		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+			});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->InvokeFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
 
+errno_t SEV_IMPL_EventLoopBase_timeout(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int timeoutMs)
+{
+	// Generic unoptimized wrapper
+	try
+	{
+		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+			});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->TimeoutFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, timeoutMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
 
+errno_t SEV_IMPL_EventLoopBase_interval(SEV_EventLoop *el, errno_t(*f)(void *capture, SEV_EventLoop *el), void *capture, ptrdiff_t size, int intervalMs)
+{
+	// Generic unoptimized wrapper
+	try
+	{
+		std::vector<uint8_t> v(size);
+		memcpy(&v[0], capture, size);
+		sev::EventFunctorView fv = std::move([f, v](sev::EventLoop &el) -> void {
+			errno_t err = f((void *)&v[0], &el);
+			if (!err) return;
+			if (err == ENOMEM) throw std::bad_alloc();
+			throw std::exception();
+			});
+		const sev::EventFunctorVt *vt;
+		void *ptr;
+		bool movable;
+		fv.extract(vt, ptr, movable, true);
+		SEV_ASSERT(movable);
+		return el->Vt->IntervalFunctor(el, vt->get(), ptr, vt->get()->MoveConstructor, intervalMs);
+	}
+	catch (std::bad_alloc)
+	{
+		return ENOMEM;
+	}
+	catch (...)
+	{
+		return EOTHER;
+	}
+	return 0;
+}
+
+static SEV_EventLoopVt s_EventLoopVt = {
+	SEV_IMPL_EventLoop_destroy, // Destroy
+
+	SEV_IMPL_EventLoopBase_post,
+	SEV_IMPL_EventLoopBase_invoke,
+	SEV_IMPL_EventLoopBase_timeout,
+	SEV_IMPL_EventLoopBase_interval,
+
+	SEV_IMPL_EventLoop_postFunctor, // PostFunctor
+	null, // InvokeFunctor
+	null, // TimeoutFunctor
+	null, // IntervalFunctor
+
+	null, // Cancel
+	null, // Join
+
+	null, // Run
+	null, // Loop
+	null, // Stop
+
+};
+
+namespace sev::impl::el {
+
+class EventLoop : public SEV_EventLoop
+{
+public:
+	EventLoop() : SEV_EventLoop{ &s_EventLoopVt }
+	{
+
+	}
+
+	EventFlag Flag;
+	ConcurrentFunctorQueue<void(EventLoop &)> Queue;
+};
+
+}
+
+SEV_EventLoop *SEV_EventLoop_create()
+{
+	try
+	{
+		return new sev::impl::el::EventLoop();
+	}
+	catch (...)
+	{
+		return null;
+	}
+}
+
+void SEV_IMPL_EventLoop_destroy(SEV_EventLoop *el)
+{
+	delete el;
+}
+
+errno_t SEV_IMPL_EventLoop_postFunctor(SEV_EventLoop *el, const SEV_FunctorVt *vt, void *ptr, void(*forwardConstructor)(void *ptr, void *other))
+{
+	sev::impl::el::EventLoop *elp = (sev::impl::el::EventLoop *)el;
+	errno_t res = SEV_ConcurrentFunctorQueue_pushFunctor(elp->Queue.get(), vt, ptr, forwardConstructor);
+	elp->Flag.set();
+	return res;
+}
 
 
 
