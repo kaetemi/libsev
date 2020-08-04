@@ -168,7 +168,7 @@ public:
 			typedef FunctorVt<TRes(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
 			rvt = vt;
 			res = ((TFn)vt->TryInvoke)(ptr, eh, args...);
-			return !eh.raised() ? eh.errNo() : SEV_ESUCCESS;
+			return eh.raised() ? eh.errNo() : SEV_ESUCCESS;
 		};
 		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
 		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
@@ -187,8 +187,9 @@ public:
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		auto fin = gsl::finally([&]() -> void { eh.rethrow(); });
-		return tryCallAndPop(eh, success, args...);
+		TRes res = tryCallAndPop(eh, success, args...);
+		eh.rethrow();
+		return std::move(res);
 	}
 
 	inline TRes tryCallAndPop(errno_t &eno, bool &success, TArgs... args) noexcept
@@ -214,7 +215,7 @@ public:
 			typedef FunctorVt<void(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
 			rvt = vt;
 			((TFn)vt->TryInvoke)(ptr, eh, args...);
-			return !eh.raised() ? eh.errNo() : SEV_ESUCCESS;
+			return eh.raised() ? eh.errNo() : SEV_ESUCCESS;
 		};
 		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
 		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
@@ -232,8 +233,8 @@ public:
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		auto fin = gsl::finally([&]() -> void { eh.rethrow(); });
 		tryCallAndPop(eh, success, args...);
+		eh.rethrow();
 	}
 
 	inline void tryCallAndPop(errno_t &eno, bool &success, TArgs... args) noexcept
