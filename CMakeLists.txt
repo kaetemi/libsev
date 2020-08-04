@@ -78,7 +78,7 @@ ENDIF ()
 
 ########################################################################
 
-ADD_SUBDIRECTORY(dependencies/fmt)
+# ADD_SUBDIRECTORY(dependencies/fmt)
 
 ADD_SUBDIRECTORY(sev)
 ADD_SUBDIRECTORY(sev_static)

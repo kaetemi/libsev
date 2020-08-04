@@ -58,6 +58,9 @@ using std::max;
 using std::min;
 #endif /* __cplusplus */
 #include <Windows.h>
+#ifdef _MSC_VER
+// #include <codeanalysis\sourceannotations.h>
+#endif
 #endif /* _WIN32 */
 
 // C++

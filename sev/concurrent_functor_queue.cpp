@@ -271,6 +271,9 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	bool locked = false;
 	SEV_ASSERT(idx);
 	SEV_ASSERT(block.ptr);
+#ifdef _MSC_VER
+	__assume(block.ptr);
+#endif
 	int debugIterations = 0;
 	int debugFailedIncrement = 0;
 	int debugFailedLockSwap = 0;

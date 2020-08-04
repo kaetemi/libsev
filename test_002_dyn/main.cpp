@@ -102,6 +102,8 @@ Local allocation count: 0
 static std::atomic_ptrdiff_t s_AllocationCount;
 
 // Override global C++ allocation for debug purpose
+#pragma warning(push)
+#pragma warning(disable: 28251)
 void *operator new(size_t sz)
 {
 	// printf("-[[[Allocate %zu bytes]]]-", sz);
@@ -119,6 +121,7 @@ void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
 	s_AllocationCount += 1;
 	return _aligned_malloc(sz, 32);
 }
+#pragma warning(pop)
 
 void operator delete(void *ptr) noexcept
 {
