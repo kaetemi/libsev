@@ -54,6 +54,7 @@ typedef void *SEV_ExceptionHandler;
 
 SEV_LIB SEV_ExceptionHandle SEV_Exception_capture(errno_t eno); // Captures a C error into an exception handle
 SEV_LIB errno_t SEV_Exception_rethrow(SEV_ExceptionHandle eh); // Rethrows the exception as a C error result, releases the internal exception state. Handle is no longer valid after this!
+SEV_LIB errno_t SEV_Exception_errNo(SEV_ExceptionHandle eh);
 
 SEV_LIB SEV_ExceptionHandle SEV_Exception_captureEx(void *exception, const char *what, void (*destroy)(void *exception), void *rethrower, errno_t eno); // Creates a new exception handle from a captured exception.
 SEV_LIB void SEV_Exception_extractEx(SEV_ExceptionHandle eh, void **exception, const char** what, void (**destroy)(void *exception), void **rethrower, errno_t *eno); // Extracts data from exception. Call discardEx manually when done with the data.
@@ -104,7 +105,7 @@ public:
 		}
 	}
 
-	SEV_FORCE_INLINE bool raised() noexcept
+	SEV_FORCE_INLINE bool raised() const noexcept
 	{
 		return eh;
 	}
@@ -150,6 +151,13 @@ public:
 				break;
 			}
 		}
+	}
+
+	SEV_FORCE_INLINE errno_t rethrow(std::nothrow_t) noexcept
+	{
+		errno_t eno = SEV_Exception_rethrow(eh);
+		eh = SEV_ESUCCESS;
+		return eno;
 	}
 
 	SEV_FORCE_INLINE void discard() noexcept
@@ -204,6 +212,11 @@ public:
 			discard();
 		}
 		eh = SEV_Exception_capture(eno);
+	}
+
+	SEV_FORCE_INLINE errno_t errNo() const noexcept
+	{
+		return SEV_Exception_errNo(eh);
 	}
 
 private:

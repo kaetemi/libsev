@@ -94,10 +94,12 @@ public:
 		, /*MoveConstructor*/([](void *, void *) -> void {})
 		, /*Destroy*/([](void *) -> void {})
 		, /*Invoke*/((TInvoke)([](void *, TArgs...) -> TRes { throw std::bad_function_call(); }))
-		, /*TryInvoke*/((TTryInvoke)([](void *, ExceptionHandle &, TArgs...) -> TRes { throw std::bad_function_call(); }))
+		, /*TryInvoke*/((TTryInvoke)([](void *, ExceptionHandle &, TArgs...) -> TRes { throw std::bad_function_call(); })) }
+#if 0
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *, void **err, TArgs...) -> TRes { *err = SEV_BadFunctionCall; return TRes(); }))
 		, /*DestroyException*/([](void *) -> void {}) }
+#endif
 	{
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
 	}
@@ -139,7 +141,8 @@ public:
 			return eh.capture<TRes>([&]() -> TRes {
 				return (*f)(args...);
 			});
-		})
+		})}
+#if 0
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
 			try
@@ -161,7 +164,7 @@ public:
 			if (err != SEV_BadAlloc)
 				delete err;
 		})
-	}
+#endif
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));
@@ -196,14 +199,15 @@ public:
 		}), /*TryInvoke*/(TTryInvoke)([](void *ptr, ExceptionHandle &, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			return (*f)(args...);
-			})
+			})}
+#if 0
 		, /*Rethrower*/impl::rethrower()
 		, /*InvokeCatch*/((TInvokeCatch)([](void *ptr, void **err, TArgs... args) -> TRes {
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			return (*f)(args...);
 		})),
 		([](void *err) -> void { })
-	}
+#endif
 	{
 		static_assert(alignof(TFunc) <= SEV_FUNCTOR_ALIGN);
 		static_assert(sizeof(FunctorVt) == sizeof(SEV_FunctorVt));

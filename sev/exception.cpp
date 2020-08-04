@@ -366,6 +366,12 @@ errno_t SEV_Exception_rethrow(SEV_ExceptionHandle eh)
 	return eno;
 }
 
+SEV_LIB errno_t SEV_Exception_errNo(SEV_ExceptionHandle eh)
+{
+	if (!eh) return SEV_ESUCCESS;
+	return eh->ErrNo;
+}
+
 void SEV_Exception_discardEx(SEV_ExceptionHandle eh)
 {
 	if (!eh) return;

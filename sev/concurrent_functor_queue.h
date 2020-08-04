@@ -134,11 +134,35 @@ public:
 			throw std::bad_alloc();
 	}
 
-	inline TRes tryCallAndPop(void *&err, const SEV_FunctorVt *&rvt, TArgs... args) noexcept
+	inline TRes tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
+	{
+		TRes res;
+		const SEV_FunctorVt *rvt = null;
+		auto invokeData = [=, &eh, &res, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
+			typedef FunctorVt<TRes(TArgs...)>::TTryInvoke TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
+			rvt = vt;
+			res = ((TFn)vt->TryInvoke)(ptr, eh, args...);
+			return !eh.raised() ? eh.errNo() : SEV_ESUCCESS;
+		};
+		static const FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)> wrapvt(invokeData);
+		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
+		static const TInvoke invokeCall = (TInvoke)wrapvt.get()->Invoke;
+		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
+		success = rvt;
+		if (!eh.raised() && ec)
+		{
+			if (success) eh.capture(ec);
+			else if (ec != ENODATA) eh.capture(ec);
+		}
+		return res;
+	}
+
+#if 0
+	inline TRes tryCallAndPop(void *&err, bool &success, TArgs... args) noexcept
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		TRes res;
-		rvt = null;
+		const SEV_FunctorVt *rvt = null;
 		auto invokeData = [=, &err, &res, &rvt](void *ptr, const SEV_FunctorVt *vt) -> errno_t {
 			typedef FunctorVt<TRes(TArgs...)>::TInvokeCatch TFn; // typedef TRes(*TFn)(void *ptr, void **err, TArgs...);
 			rvt = vt;
@@ -149,19 +173,27 @@ public:
 		typedef FunctorVt<errno_t(void *, const SEV_FunctorVt *vt)>::TInvoke TInvoke;
 		static const TInvoke invokeCall = (TInvoke)wrapvt.get()->Invoke;
 		errno_t ec = SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(&m, invokeCall, (void *)(&invokeData));
+		success = rvt;
 		if (!err && ec) err = SEV_BadException;
 		return res;
 	}
+#endif
 
 	inline TRes tryCallAndPop(bool &success, TArgs... args)
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
-		void *err;
-		const SEV_FunctorVt *rvt = null;
-		TRes res = tryCallAndPop(err, rvt, args...);
-		success = rvt;
-		if (rvt)
-			((const FunctorVt<void()> *)rvt)->rethrow(err); // Rethrow any exception
+		ExceptionHandle eh;
+		TRes res = tryCallAndPop(eh, success, args...);
+		eh.rethrow();
+		return res;
+	}
+
+	inline TRes tryCallAndPop(errno_t &eno, bool &success, TArgs... args) noexcept
+	{
+		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
+		ExceptionHandle eh;
+		TRes res = tryCallAndPop(eh, success, args...);
+		eno = eh.rethrow(nothrow);
 		return res;
 	}
 	

@@ -627,7 +627,9 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 	// Call
 	SEV_ASSERT(SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
 	SEV_ASSERT(SEV_AtomicPtrDiff_load(&functorPreamble->Ready));
-	return caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt);
+	errno_t eno = caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt);
+	if (eno == ENODATA) eno = EOTHER;
+	return eno;
 }
 
 /* end of file */
