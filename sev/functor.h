@@ -159,7 +159,7 @@ public:
 		if (this != &other)
 		{
 			p_destroyPtr();
-			new (this) T(forward(other));
+			new (this) T(forward<decltype(other)>(other));
 		}
 		return *this;
 	}
