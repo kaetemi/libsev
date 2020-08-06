@@ -43,9 +43,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*
 */
-
 static std::atomic_ptrdiff_t s_AllocationCount;
-
+#if 0
 // Override global C++ allocation for debug purpose
 #pragma warning(push)
 #pragma warning(disable: 28251)
@@ -74,9 +73,121 @@ void operator delete(void *ptr) noexcept
 	_aligned_free(ptr);
 	s_AllocationCount -= 1;
 }
+#elif 0
+// Override global C++ allocation for debug purpose
+#pragma warning(push)
+#pragma warning(disable: 28251)
+void *operator new(size_t sz)
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	// std::cout << sz << std::endl;
+	void *ptr = malloc(sz);
+	if (ptr)
+		return ptr;
+	else
+		throw std::bad_alloc{};
+}
 
+void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	return malloc(sz);
+}
+#pragma warning(pop)
+
+void operator delete(void *ptr) noexcept
+{
+	// printf("-[[[Free pointer]]]-");
+	free(ptr);
+	s_AllocationCount -= 1;
+}
+#elif 0
+// Override global C++ allocation for debug purpose
+#pragma warning(push)
+#pragma warning(disable: 28251)
+void *operator new(size_t sz)
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	sz += sizeof(ptrdiff_t) + (32 - 1);
+	// sz += (32 - 1);
+	// sz &= ~((ptrdiff_t)(32 - 1));
+	void *ptr = malloc(sz);
+	if (ptr)
+	{
+		ptrdiff_t p = (ptrdiff_t)ptr + 8;
+		p += (32 - 1);
+		p &= ~((ptrdiff_t)(32 - 1));
+		((void **)(void *)p)[-1] = ptr;
+		return (void *)p;
+	}
+	else
+		throw std::bad_alloc{};
+}
+
+void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	sz += sizeof(ptrdiff_t) + (32 - 1);
+	// sz += (32 - 1);
+	// sz &= ~((ptrdiff_t)(32 - 1));
+	void *ptr = malloc(sz);
+	if (ptr)
+	{
+		ptrdiff_t p = (ptrdiff_t)ptr + 8;
+		p += (32 - 1);
+		p &= ~((ptrdiff_t)(32 - 1));
+		((void **)(void *)p)[-1] = ptr;
+		return (void *)p;
+	}
+	else
+		return null;
+}
+#pragma warning(pop)
+
+void operator delete(void *ptr) noexcept
+{
+	// printf("-[[[Free pointer]]]-");
+	free(((void **)ptr)[-1]);
+	s_AllocationCount -= 1;
+}
+#elif 0
+// Override global C++ allocation for debug purpose
+#pragma warning(push)
+#pragma warning(disable: 28251)
+void *operator new(size_t sz)
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	std::cout << sz << std::endl;
+	void *ptr = malloc(sz + 40);
+	if (ptr)
+		return ptr;
+	else
+		throw std::bad_alloc{};
+}
+
+void* operator new(size_t sz, const std::nothrow_t& tag) noexcept
+{
+	// printf("-[[[Allocate %zu bytes]]]-", sz);
+	s_AllocationCount += 1;
+	return malloc(sz + 40);
+}
+#pragma warning(pop)
+
+void operator delete(void *ptr) noexcept
+{
+	// printf("-[[[Free pointer]]]-");
+	free(ptr);
+	s_AllocationCount -= 1;
+}
+#endif
 std::string s_S = "This is really a very long string that definitely won't fit inside the builtin storage"s;
 std::string s_T = "This is really a very long string that also won't fit inside the builtin storage"s;
+std::string s_U = "This is really a very long string that also really won't fit inside the builtin storage"s;
 std::string s_Y = "!"s;
 
 #define DEF_ALL 0
@@ -86,7 +197,7 @@ int main()
 #define DO_POPS
 	const int loop = 16;
 	int lc = 0;
-	const int rounds = (1024 * 1024) * 8;
+	const int rounds = (1024 * 1024) * 8 * 1;
 	const int tc = 8;
 	PROCESS_MEMORY_COUNTERS pmc;
 	bool hederok = false;
@@ -116,13 +227,14 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if DEF_ALL
+#if 1
 	{
-		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
+		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 3 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
 		std::string t = s_T + s_Y;
-		auto f = [s, t](int x, int y) -> int {
-			if (s[0] == 'T' && t[0] == 'T') return x + y;
+		std::string u = s_U + s_Y;
+		auto f = [s, t, u](int x, int y) -> int {
+			if (s[0] == 'T' && t[0] == 'T' && u[0] == 'T') return x + y;
 			return -1;
 		};
 		std::queue<std::function<int(int,int)>> q;
@@ -162,6 +274,8 @@ Again:
 	{
 		ms = delta();
 		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		if (!hederok) hdr << "queue 1t 2s: dealloc ms, ";
+		csv << ms << ", ";
 		delta();
 	}
 	{
@@ -795,7 +909,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if 0
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
