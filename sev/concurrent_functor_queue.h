@@ -45,6 +45,33 @@ Concurrent queue for arbitrary-sized functors with a fixed-size block allocator.
 extern "C" {
 #endif
 
+static inline uint64_t SEV_nextPow2U64(uint64_t v)
+{
+	v -= 1;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v |= v >> 32;
+	v += 1;
+	return v;
+}
+
+static inline ptrdiff_t SEV_nextPow2PtrDiff(ptrdiff_t v)
+{
+	v -= 1;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	if (sizeof(ptrdiff_t) == sizeof(uint64_t))
+		v |= v >> 32;
+	v += 1;
+	return v;
+}
+
 struct SEV_ConcurrentFunctorQueue
 {
 	ptrdiff_t BlockSize;

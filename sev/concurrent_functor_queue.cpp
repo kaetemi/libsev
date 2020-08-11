@@ -49,6 +49,7 @@ namespace /* anonymous */ {
 struct BlockPreamble
 {
 	SEV_AtomicPtr NextBlock;
+	ptrdiff_t StartIdx;
 
 	SEV_AtomicPtrDiff ReadIdx;
 	SEV_AtomicInt32 ReadShared;
@@ -66,13 +67,15 @@ struct FunctorPreamble
 };
 
 #define SEV_BLOCK_PREAMBLE_SIZE (SEV_FUNCTOR_ALIGNED(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble)))
+#define SEV_BLOCK_UNPAD (32)
 
 void wipeBlockOnly(void *block)
 {
 	uint8_t *b = (uint8_t *)block;
 	BlockPreamble *blockPreamble = (BlockPreamble *)block;
 	blockPreamble->NextBlock = null;
-	blockPreamble->ReadIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
+	blockPreamble->ReadIdx = blockPreamble->StartIdx;
+	SEV_ASSERT(blockPreamble->StartIdx >= SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble));
 	blockPreamble->ReadShared = 0;
 	// blockPreamble->PreWriteShared = 0;
 #ifdef SEV_DEBUG_NB_OBJECTS
@@ -80,12 +83,26 @@ void wipeBlockOnly(void *block)
 #endif
 }
 
-void wipeBlock(void *block, ptrdiff_t blockSize)
+void wipeBlock(void *block, const ptrdiff_t blockSize)
 {
 	wipeBlockOnly(block);
 	uint8_t *b = (uint8_t *)block;
-	for (ptrdiff_t i = (SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble)); i < blockSize; i += SEV_FUNCTOR_ALIGN)
+	BlockPreamble *blockPreamble = (BlockPreamble *)block;
+	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
+	for (ptrdiff_t i = blockPreamble->StartIdx; i < blockLimit; i += SEV_FUNCTOR_ALIGN)
 		((sev::FunctorPreamble *)&b[i])->Ready = 0;
+}
+
+void initBlock(void *block, const ptrdiff_t blockSize)
+{
+	const ptrdiff_t preambleSize = SEV_BLOCK_PREAMBLE_SIZE;
+	const ptrdiff_t unpadSize = SEV_BLOCK_UNPAD; // Spacing for allocator
+	const ptrdiff_t startAddr = SEV_FUNCTOR_ALIGNED((ptrdiff_t)block + preambleSize) - sizeof(sev::FunctorPreamble);
+	const ptrdiff_t startIdx = startAddr - (ptrdiff_t)block;
+	SEV_ASSERT(startIdx >= SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble));
+	BlockPreamble *blockPreamble = (BlockPreamble *)block;
+	blockPreamble->StartIdx = startIdx;
+	wipeBlock(block, blockSize);
 }
 
 } /* anonymous namespace */
@@ -115,12 +132,14 @@ void SEV_ConcurrentFunctorQueue_destroy(SEV_ConcurrentFunctorQueue *concurrentFu
 errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_t blockSize)
 {
 	static_assert((sizeof(SEV_ConcurrentFunctorQueue) % 32) == 0);
+	blockSize = SEV_nextPow2PtrDiff(blockSize);
+	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
 
 	static_assert(SEV_BLOCK_PREAMBLE_SIZE == SEV_FUNCTOR_ALIGN); // Just for testing, it should be exactly this now. It can be any multiple
 	me->AtomicWriteSwap = { 0, 0 };
 	me->DeleteLock = { 0, 0 };
 	me->BlockSize = blockSize;
-	me->ReadBlock = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN);
+	me->ReadBlock = (uint8_t *)malloc(blockLimit);
 	if (!me->ReadBlock)
 	{
 		me->WriteBlock = null;
@@ -129,14 +148,16 @@ errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_
 		return ENOMEM;
 	}
 	me->WriteBlock = me->ReadBlock;
-	me->SpareBlockB = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN); // Also works without, but it will end up allocated anyway when flipping during write (no need to check null)
-	me->SpareBlockA = (uint8_t *)SEV_alignedMAlloc(blockSize, SEV_FUNCTOR_ALIGN);
-	me->PreWriteIdx = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
-	sev::wipeBlock(me->WriteBlock, blockSize);
+	sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)me->ReadBlock;
+	me->SpareBlockB = (uint8_t *)malloc(blockLimit); // Also works without, but it will end up allocated anyway when flipping during write (no need to check null)
+	me->SpareBlockA = (uint8_t *)malloc(blockLimit);
+	sev::initBlock(me->WriteBlock, blockSize);
+	me->PreWriteIdx = blockPreamble->StartIdx;
+	SEV_ASSERT(me->PreWriteIdx >= SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble));
 	if (me->SpareBlockB)
-		sev::wipeBlock(me->SpareBlockB, blockSize);
+		sev::initBlock(me->SpareBlockB, blockSize);
 	if (me->SpareBlockA)
-		sev::wipeBlock(me->SpareBlockA, blockSize);
+		sev::initBlock(me->SpareBlockA, blockSize);
 	return 0;
 }
 
@@ -144,12 +165,12 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 {
 	SEV_ASSERT(!SEV_AtomicSharedMutex_isLocked(&me->AtomicWriteSwap)); // TODO: Don't allow shared locks either...
 
-	SEV_alignedFree(me->SpareBlockA);
+	free(me->SpareBlockA);
 #ifdef SEV_DEBUG
 	me->SpareBlockA = null;
 #endif
 
-	SEV_alignedFree(me->SpareBlockB);
+	free(me->SpareBlockB);
 #ifdef SEV_DEBUG
 	me->SpareBlockB = null;
 #endif
@@ -157,6 +178,7 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 	// ptrdiff_t idx = me->ReadIdx;
 	uint8_t *block = (uint8_t *)me->ReadBlock;
 	const ptrdiff_t blockSize = me->BlockSize;
+	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
 #ifdef SEV_DEBUG
 	me->ReadBlock = null;
 #endif
@@ -164,7 +186,7 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 	{
 		sev::BlockPreamble *blockPreamble = (sev::BlockPreamble *)block;
 		ptrdiff_t idx = blockPreamble->ReadIdx;
-		for (ptrdiff_t i = idx; i < blockSize; i += ((sev::FunctorPreamble *)(&block[i]))->Size)
+		for (ptrdiff_t i = idx; i < blockLimit; i += ((sev::FunctorPreamble *)(&block[i]))->Size)
 		{
 			ptrdiff_t ptrIdx = i + sizeof(sev::FunctorPreamble);
 			sev::FunctorPreamble *functorPreamble = (sev::FunctorPreamble *)(&block[i]);
@@ -173,7 +195,7 @@ void SEV_ConcurrentFunctorQueue_release(SEV_ConcurrentFunctorQueue *me)
 			functorPreamble->Vt->Destroy((void *)&block[ptrIdx]);
 		}
 		uint8_t *nextBlock = (uint8_t *)blockPreamble->NextBlock;
-		SEV_alignedFree((void *)block);
+		free((void *)block);
 		block = nextBlock;
 	}
 }
@@ -230,26 +252,27 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	static_assert(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble) < SEV_BLOCK_PREAMBLE_SIZE);
 	const ptrdiff_t sz = SEV_FUNCTOR_ALIGNED(size + sizeof(sev::FunctorPreamble)); // Pad
 	const ptrdiff_t blockSize = me->BlockSize;
-	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockSize)
+	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
+	if (sz + SEV_BLOCK_PREAMBLE_SIZE > blockLimit)
 		return ENOMEM;
 
 	// Allocate a spare when done, allows us to malloc outside of the lock
 	bool outOfSpare = false;
-	auto fin2 = gsl::finally([me, blockSize, &outOfSpare]() -> void {
+	auto fin2 = gsl::finally([me, blockSize, blockLimit, &outOfSpare]() -> void {
 		if (!outOfSpare)
 			return;
 		if (SEV_AtomicPtr_load(&me->SpareBlockB))
 			return; // No need, already have a spare again
-		void *block = SEV_alignedMAlloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+		void *block = malloc(blockLimit);
 		if (!block) return; // Failed to allocate, no problem here
-		sev::wipeBlock(block, blockSize);
+		sev::initBlock(block, blockSize);
 		// Put it in spare B first, in spare A if B is already full
 		uint8_t *spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockB, block, null);
 		if (spareBlock)
 		{
 			spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, block, null);
 			if (spareBlock) // Blocks were returned already, no need anymore!
-				SEV_alignedFree((void *)block);
+				free((void *)block);
 		}
 	});
 
@@ -285,7 +308,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	{
 		++debugIterations;
 		bool debugEnteredWhile = false;
-		while (!locked && (idxMasked + sz > blockSize || SEV_AtomicSharedMutex_isLocked(&me->AtomicWriteSwap)))
+		while (!locked && (idxMasked + sz > blockLimit || SEV_AtomicSharedMutex_isLocked(&me->AtomicWriteSwap)))
 		{
 			debugEnteredAnyWhile = true;
 			debugEnteredWhile = true;
@@ -313,10 +336,6 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 
 				// Calculate next index on block boundary
 				debugProcessedWriteSwap = true;
-				static const ptrdiff_t allocIdxMasked = SEV_BLOCK_PREAMBLE_SIZE - sizeof(sev::FunctorPreamble);
-				ptrdiff_t allocIdx = ((idx + blockSize - 1) & ~(blockSize - 1)) + allocIdxMasked; // Round up block size and add new starting index
-				ptrdiff_t allocNextIdx = allocIdx + sz;
-				SEV_ASSERT((allocNextIdx & (blockSize - 1)) > allocIdxMasked);
 
 				// Obtain a memory allocation
 				BlockData allocBlock = { SEV_AtomicPtr_exchange(&me->SpareBlockA, null) }; // Get spare and switch to null
@@ -325,7 +344,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 					allocBlock.ptr = SEV_AtomicPtr_exchange(&me->SpareBlockB, null); // Read B after A
 					if (!allocBlock.ptr)
 					{
-						allocBlock.ptr = SEV_alignedMAlloc(me->BlockSize, SEV_FUNCTOR_ALIGN);
+						allocBlock.ptr = malloc(blockLimit);
 						if (!allocBlock.ptr)
 						{
 							errno_t res = errno;
@@ -334,13 +353,19 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 							if (res) return res;
 							return ENOMEM;
 						}
-						sev::wipeBlock(allocBlock.ptr, blockSize);
+						sev::initBlock(allocBlock.ptr, blockSize);
 					}
 					else
 					{
 						outOfSpare = true; // Allocate a spare later while not under lock
 					}
 				}
+
+				const ptrdiff_t allocIdxMasked = allocBlock.preamble->StartIdx;
+				ptrdiff_t allocIdx = ((idx + blockSize - 1) & ~(blockSize - 1)) + allocIdxMasked; // Round up block size and add new starting index
+				ptrdiff_t allocNextIdx = allocIdx + sz;
+				SEV_ASSERT((allocNextIdx & (blockSize - 1)) > allocIdxMasked);
+
 				SEV_ASSERT(!allocBlock.preamble->NextBlock);
 				SEV_ASSERT(allocBlock.preamble->ReadIdx == allocIdxMasked);
 				SEV_ASSERT(!allocBlock.preamble->NbObjects);
@@ -425,6 +450,7 @@ errno_t SEV_ConcurrentFunctorQueue_pushFunctorEx(SEV_ConcurrentFunctorQueue *me,
 	functorPreamble->Vt = vt;
 	functorPreamble->Size = sz; // Size including preamble and post-padding
 	SEV_ASSERT(((ptrdiff_t)&block.data[ptrIdx] & SEV_FUNCTOR_ALIGN_MASK) == (ptrdiff_t)&block.data[ptrIdx]); // Check alignment
+	SEV_ASSERT(SEV_FUNCTOR_ALIGNED((ptrdiff_t)block.ptr + ptrIdx) == (ptrdiff_t)block.ptr + ptrIdx);
 
 	// Prepare commit, just in case write throws
 	auto fin = gsl::finally([&]() -> void {
@@ -473,6 +499,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 	// std::unique_lock<std::shared_mutex> l(*m);
 
 	const ptrdiff_t blockSize = me->BlockSize;
+	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
 
 	// Safely get the reading block, and increment the sharing counter
 	SEV_AtomicSharedMutex_lockShared(&me->DeleteLock);
@@ -503,7 +530,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 				SEV_ASSERT((uint8_t *)readBlockPreamble == readBlock);
 #ifdef SEV_DEBUG
 				auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readBlockPreamble->ReadIdx]);
-				SEV_ASSERT(!(readBlockPreamble->ReadIdx < blockSize && functorPreamble->Ready));
+				SEV_ASSERT(!(readBlockPreamble->ReadIdx < blockLimit && functorPreamble->Ready));
 #endif
 #ifdef SEV_DEBUG_NB_OBJECTS
 				SEV_ASSERT(!SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
@@ -517,7 +544,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 				{
 					spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, readBlock, null);
 					if (spareBlock) // Old value was not 0, not using this as a spare block
-						SEV_alignedFree((void *)readBlock);
+						free((void *)readBlock);
 				}
 			}
 		}
@@ -528,14 +555,14 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 	for (; ; )
 	{
 		const auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readIdx]);
-		const bool functorReady = readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready);
+		const bool functorReady = readIdx < blockLimit && SEV_AtomicPtrDiff_load(&functorPreamble->Ready);
 		if (!functorReady) // No more read space, or flag not set
 		{
 			// Nothing new in this block
 			if (SEV_AtomicPtr_load(&readBlockPreamble->NextBlock)) // Next block available
 			{
-				// SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
-				if (readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready))
+				// SEV_ASSERT(!(readIdx < blockLimit && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
+				if (readIdx < blockLimit && SEV_AtomicPtrDiff_load(&functorPreamble->Ready))
 				{
 					debugTriedAgain = true;
 					continue; // Try again
@@ -544,7 +571,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 				// Old block
 				sev::BlockPreamble *oldReadBlock = readBlockPreamble;
 
-				// while (SEV_AtomicPtrDiff_load(&me->PreWriteIdx) > me->BlockSize)
+				// while (SEV_AtomicPtrDiff_load(&me->PreWriteIdx) > blockLimit)
 				// 	SEV_Thread_yield(); // TEST
 
 				// Swap to the next block (if we're still reading the current block) (and fetch the block that's being read now)
@@ -563,7 +590,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 				readBlockPreamble = (sev::BlockPreamble *)readBlock;
 				SEV_AtomicInt32_increment(&readBlockPreamble->ReadShared);
 #ifdef SEV_DEBUG
-				SEV_ASSERT(!(readIdx < blockSize && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
+				SEV_ASSERT(!(readIdx < blockLimit && SEV_AtomicPtrDiff_load(&functorPreamble->Ready)));
 #endif
 				long readShared = SEV_AtomicInt32_decrement(&oldReadBlock->ReadShared);
 				SEV_ASSERT(readShared >= 0);
@@ -585,7 +612,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 					{
 						spareBlock = (uint8_t *)SEV_AtomicPtr_compareExchange(&me->SpareBlockA, oldReadBlock, null);
 						if (spareBlock) // Old value was not 0, not using this as a spare block
-							SEV_alignedFree((void *)oldReadBlock);
+							free((void *)oldReadBlock);
 					}
 				}
 
@@ -613,7 +640,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 	// Prepare calls
 	auto functorPreamble = (sev::FunctorPreamble *)(&readBlock[readIdx]);
 	ptrdiff_t readPtrIdx = readIdx + sizeof(sev::FunctorPreamble);
-	SEV_ASSERT(SEV_FUNCTOR_ALIGNED(readPtrIdx) == readPtrIdx);
+	SEV_ASSERT(SEV_FUNCTOR_ALIGNED((ptrdiff_t)readBlock + readPtrIdx) == (ptrdiff_t)readBlock + readPtrIdx);
 
 	// Prepare exit, in case invoke call throws
 	auto fin2 = gsl::finally([&]() -> void {
@@ -627,6 +654,7 @@ SEV_LIB errno_t SEV_ConcurrentFunctorQueue_tryCallAndPopFunctorEx(SEV_Concurrent
 	// Call
 	SEV_ASSERT(SEV_AtomicInt32_load(&readBlockPreamble->NbObjects));
 	SEV_ASSERT(SEV_AtomicPtrDiff_load(&functorPreamble->Ready));
+	SEV_ASSERT(functorPreamble->Vt->Size <= functorPreamble->Size);
 	errno_t eno = caller(args, (void *)&readBlock[readPtrIdx], functorPreamble->Vt);
 	if (eno == ENODATA) eno = EOTHER;
 	return eno;
