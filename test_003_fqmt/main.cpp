@@ -197,7 +197,7 @@ int main()
 #define DO_POPS
 	const int loop = 16;
 	int lc = 0;
-	const int rounds = (1024 * 1024) * 8 * 1;
+	const int rounds = (1024 * 1024) * 8 * 2;
 	const int tc = 8;
 	PROCESS_MEMORY_COUNTERS pmc;
 	bool hederok = false;
@@ -227,7 +227,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 1
+#if DEF_ALL
 	{
 		std::cout << "Test std::queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 3 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -291,8 +291,9 @@ Again:
 		std::cout << "Test concurrency::concurrent_queue<std::function<int(int,int)>>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
 		std::string t = s_T + s_Y;
-		auto f = [s, t](int x, int y) -> int {
-			if (s[0] == 'T' && t[0] == 'T') return x + y;
+		//std::string u = s_U + s_Y;
+		auto f = [s, t/*, u*/](int x, int y) -> int {
+			if (s[0] == 'T' && t[0] == 'T' /*&& u[0] == 'T'*/) return x + y;
 			return -1;
 		};
 		concurrency::concurrent_queue<std::function<int(int,int)>> q;
@@ -341,13 +342,14 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if DEF_ALL
+#if 1
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<int(int,int)>::push(f) single threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
 		std::string t = s_T + s_Y;
-		auto f = [s, t](int x, int y) -> int {
-			if (s[0] == 'T' && t[0] == 'T') return x + y;
+		//std::string u = s_U + s_Y;
+		auto f = [s, t/*, u*/](int x, int y) -> int {
+			if (s[0] == 'T' && t[0] == 'T' /*&& u[0] == 'T'*/) return x + y;
 			return -1;
 		};
 		sev::ConcurrentFunctorQueue<int(int,int)> q;
@@ -425,6 +427,8 @@ Again:
 	{
 		ms = delta();
 		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		if (!hederok) hdr << "dealloc, ";
+		csv << ms << ", ";
 		delta();
 	}
 	{
@@ -457,6 +461,8 @@ Again:
 	{
 		ms = delta();
 		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		if (!hederok) hdr << "dealloc, ";
+		csv << ms << ", ";
 		delta();
 	}
 	{
@@ -538,6 +544,8 @@ Again:
 	{
 		ms = delta();
 		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		if (!hederok) hdr << "dealloc, ";
+		csv << ms << ", ";
 		delta();
 	}
 	{
@@ -548,7 +556,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0 ///////////
+#if DEF_ALL ///////////
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) "sv << tc << " threaded with "sv << rounds << " entries and 2 strings"sv << std::endl;
 		std::string s = s_S + s_Y;
@@ -641,6 +649,8 @@ Again:
 	{
 		ms = delta();
 		std::cout << "Deallocation: "sv << ms << "ms"sv << std::endl;
+		if (!hederok) hdr << "dealloc, ";
+		csv << ms << ", ";
 		delta();
 	}
 	{
@@ -909,7 +919,7 @@ Again:
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////
-#if 0
+#if DEF_ALL
 	{
 		std::cout << "Test sev::ConcurrentFunctorQueue<std::function<int(int,int)>::push(f) and pop(f) "sv << tc << " threaded total with "sv << rounds << " plain entries"sv << std::endl;
 		auto f = [](int x, int y) -> int {
