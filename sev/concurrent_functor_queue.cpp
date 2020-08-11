@@ -67,7 +67,16 @@ struct FunctorPreamble
 };
 
 #define SEV_BLOCK_PREAMBLE_SIZE (SEV_FUNCTOR_ALIGNED(sizeof(sev::BlockPreamble) + sizeof(sev::FunctorPreamble)))
+
+#ifdef WIN32
+#ifdef _DEBUG
+#define SEV_BLOCK_UNPAD (32 + 48)
+#else
 #define SEV_BLOCK_UNPAD (32)
+#endif
+#else
+#define SEV_BLOCK_UNPAD (0)
+#endif
 
 void wipeBlockOnly(void *block)
 {
