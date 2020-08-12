@@ -142,6 +142,7 @@ errno_t SEV_ConcurrentFunctorQueue_init(SEV_ConcurrentFunctorQueue *me, ptrdiff_
 {
 	static_assert((sizeof(SEV_ConcurrentFunctorQueue) % 32) == 0);
 	blockSize = SEV_nextPow2PtrDiff(blockSize);
+	blockSize = max((ptrdiff_t)512, blockSize);
 	const ptrdiff_t blockLimit = blockSize - SEV_BLOCK_UNPAD;
 
 	static_assert(SEV_BLOCK_PREAMBLE_SIZE == SEV_FUNCTOR_ALIGN); // Just for testing, it should be exactly this now. It can be any multiple
