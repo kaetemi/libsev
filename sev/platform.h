@@ -1,6 +1,6 @@
 /*
 
-Copyright (C) 2019-2020  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
+Copyright (C) 2019-2021  Jan BOON (Kaetemi) <jan.boon@kaetemi.be>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -83,19 +83,9 @@ constexpr decltype(nullptr) null = nullptr;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-// A couple of types for the global namespace, for everyone's sanity.
-#if defined(_HAS_CXX20) && _HAS_CXX20
-#include <compare>
-using std::strong_ordering;
-#endif
-using std::move;
-using std::forward;
-using std::nothrow_t;
-using std::nothrow;
-
 // Include GSL
 // auto _ = gsl::finally([&] { delete xyz; });
-#include "gsl/gsl_util"
+#include <gsl/util>
 
 // The usual
 #include <functional>

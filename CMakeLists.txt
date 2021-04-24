@@ -63,7 +63,6 @@ IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 		${CMAKE_CURRENT_SOURCE_DIR}
 		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/debugbreak
 		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/gsl/include
-		${CMAKE_CURRENT_SOURCE_DIR}/dependencies/fmt/include
 	)
 	
 	########################################################################
@@ -78,14 +77,26 @@ ENDIF ()
 
 ########################################################################
 
-# ADD_SUBDIRECTORY(dependencies/fmt)
+OPTION(SEV_BUILD_SHARED "Build SEv shared library" ON)
+OPTION(SEV_BUILD_STATIC "Build SEv static library" ON)
+OPTION(SEV_BUILD_LITE "Build SEv lite library" ON)
 
-ADD_SUBDIRECTORY(sev)
-ADD_SUBDIRECTORY(sev_static)
-ADD_SUBDIRECTORY(sev_lite)
+########################################################################
 
-ADD_SUBDIRECTORY(test_001_dev)
-ADD_SUBDIRECTORY(test_002_dyn)
-ADD_SUBDIRECTORY(test_003_fqmt)
+IF (SEV_BUILD_SHARED)
+	ADD_SUBDIRECTORY(sev)
+ENDIF ()
+IF (SEV_BUILD_STATIC)
+	ADD_SUBDIRECTORY(sev_static)
+ENDIF ()
+IF (SEV_BUILD_LITE)
+	ADD_SUBDIRECTORY(sev_lite)
+ENDIF ()
+
+IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+	ADD_SUBDIRECTORY(test_001_dev)
+	ADD_SUBDIRECTORY(test_002_dyn)
+	ADD_SUBDIRECTORY(test_003_fqmt)
+ENDIF ()
 
 ########################################################################

@@ -131,7 +131,7 @@ struct ConcurrentFunctorQueue
 {
 public:
 	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) { if (SEV_ConcurrentFunctorQueue_init(&m, blockSize)) throw std::bad_alloc(); }
-	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
+	inline ConcurrentFunctorQueue(std::nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept { SEV_ConcurrentFunctorQueue_init(&m, blockSize); }
 	inline ~ConcurrentFunctorQueue() { SEV_ConcurrentFunctorQueue_release(&m); }
 
 	inline void push(const FunctorView<TRes(TArgs...)> &fv)
@@ -160,7 +160,7 @@ public:
 		ExceptionHandle::rethrow(SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, movable ? vt->get()->MoveConstructor : vt->get()->CopyConstructor));
 	}
 
-	inline errno_t push(nothrow_t, const FunctorView<TRes(TArgs...)> &fv) noexcept
+	inline errno_t push(std::nothrow_t, const FunctorView<TRes(TArgs...)> &fv) noexcept
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
@@ -168,7 +168,7 @@ public:
 		return SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->ConstCopyConstructor);
 	}
 
-	inline errno_t push(nothrow_t, FunctorView<TRes(TArgs...)> &fv) noexcept
+	inline errno_t push(std::nothrow_t, FunctorView<TRes(TArgs...)> &fv) noexcept
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
@@ -177,7 +177,7 @@ public:
 		return SEV_ConcurrentFunctorQueue_pushFunctorEx(&m, vt->get(), vt->size(), ptr, vt->get()->CopyConstructor);
 	}
 
-	inline errno_t push(nothrow_t, FunctorView<TRes(TArgs...)> &&fv) noexcept
+	inline errno_t push(std::nothrow_t, FunctorView<TRes(TArgs...)> &&fv) noexcept
 	{
 		const FunctorVt<TRes(TArgs...)> *vt;
 		void *ptr;
@@ -210,7 +210,7 @@ struct ConcurrentFunctorQueue<TRes(TArgs...)> : public impl::q::ConcurrentFuncto
 {
 public:
 	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) : impl::q::ConcurrentFunctorQueue<TRes, TArgs...>(blockSize) { }
-	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<TRes, TArgs...>(nothrow, blockSize) { }
+	inline ConcurrentFunctorQueue(std::nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<TRes, TArgs...>(std::nothrow, blockSize) { }
 
 	inline TRes tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
 	{
@@ -248,7 +248,7 @@ public:
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(nothrow); });
+		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(std::nothrow); });
 		return tryCallAndPop(eh, success, args...);
 	}
 };
@@ -258,7 +258,7 @@ struct ConcurrentFunctorQueue<void(TArgs...)> : public impl::q::ConcurrentFuncto
 {
 public:
 	inline ConcurrentFunctorQueue(ptrdiff_t blockSize = (64 * 1024)) : impl::q::ConcurrentFunctorQueue<void, TArgs...>(blockSize) { }
-	inline ConcurrentFunctorQueue(nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<void, TArgs...>(nothrow, blockSize) { }
+	inline ConcurrentFunctorQueue(std::nothrow_t, ptrdiff_t blockSize = (64 * 1024)) noexcept : impl::q::ConcurrentFunctorQueue<void, TArgs...>(std::nothrow, blockSize) { }
 
 	inline void tryCallAndPop(ExceptionHandle &eh, bool &success, TArgs... args) noexcept
 	{
@@ -293,7 +293,7 @@ public:
 	{
 		// This turns a lambda call into a function with three pointers (arguments, function, capture list)
 		ExceptionHandle eh;
-		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(nothrow); });
+		auto fin = gsl::finally([&]() -> void { eno = eh.rethrow(std::nothrow); });
 		tryCallAndPop(eh, success, args...);
 	}
 };

@@ -271,7 +271,7 @@ void SEV_IMPL_EventLoop_invokeFunctor(SEV_EventLoop *el, SEV_ExceptionHandle *eh
 	sev::impl::el::EventLoop *elp = (sev::impl::el::EventLoop *)el;
 	sev::EventFlag flag;
 	++elp->QueueItems;
-	errno_t eno = elp->Queue.push(nothrow, [=, &flag](sev::EventLoop &elref) -> errno_t {
+	errno_t eno = elp->Queue.push(std::nothrow, [=, &flag](sev::EventLoop &elref) -> errno_t {
 		errno_t res = ((sev::EventFunctorVt *)vt)->invoke(ptr, *(sev::ExceptionHandle *)eh, elref);
 		if (!*eh && res) *eh = SEV_Exception_capture(res);
 		flag.set();
@@ -315,7 +315,7 @@ errno_t SEV_IMPL_EventLoop_run(SEV_EventLoop *el, const SEV_FunctorVt *onError, 
 			}
 		})));
 		});
-	return ehr.rethrow(nothrow);
+	return ehr.rethrow(std::nothrow);
 }
 
 void SEV_IMPL_EventLoop_loop(SEV_EventLoop *el, SEV_ExceptionHandle *eh)

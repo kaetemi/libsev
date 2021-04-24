@@ -151,7 +151,7 @@ public:
 
 errno_t SEV_EventFlag_init(SEV_EventFlag *ef, bool manualReset, bool initialState)
 {
-	ef->Impl = new (nothrow) sev::impl::EventFlag();
+	ef->Impl = new (std::nothrow) sev::impl::EventFlag();
 	sev::impl::EventFlag *const m = ef->Impl;
 	if (!m) return ENOMEM;
 	m->Flag = initialState;

@@ -386,13 +386,13 @@ void SEV_Exception_discardEx(SEV_ExceptionHandle eh)
 
 SEV_ExceptionHandle SEV_Exception_captureEx(void *exception, const char *what, void (*destroy)(void *exception), void *rethrower, errno_t eno)
 {
-	sev::impl::Exception *e = new (nothrow) sev::impl::Exception();
+	sev::impl::Exception *e = new (std::nothrow) sev::impl::Exception();
 	if (!e) return &sev::impl::s_BadException;
 	e->Exception = exception;
 	if (what)
 	{
 		size_t whatLen = strlen(what) + 1;
-		char *whatStr = new (nothrow) char[whatLen];
+		char *whatStr = new (std::nothrow) char[whatLen];
 		if (whatStr) memcpy(whatStr, what, whatLen);
 		e->What = whatStr;
 	}

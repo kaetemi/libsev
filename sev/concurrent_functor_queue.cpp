@@ -120,7 +120,7 @@ void initBlock(void *block, const ptrdiff_t blockSize)
 SEV_ConcurrentFunctorQueue *SEV_ConcurrentFunctorQueue_create(ptrdiff_t blockSize)
 {
 	static_assert(sizeof(SEV_ConcurrentFunctorQueue) == sizeof(sev::ConcurrentFunctorQueue<void()>));
-	SEV_ConcurrentFunctorQueue *concurrentFunctorQueue = (SEV_ConcurrentFunctorQueue *)new (nothrow) sev::ConcurrentFunctorQueue<void()>(nothrow, blockSize);
+	SEV_ConcurrentFunctorQueue *concurrentFunctorQueue = (SEV_ConcurrentFunctorQueue *)new (std::nothrow) sev::ConcurrentFunctorQueue<void()>(std::nothrow, blockSize);
 	if (!concurrentFunctorQueue)
 	{
 		return null;

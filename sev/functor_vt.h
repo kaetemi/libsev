@@ -112,7 +112,7 @@ public:
 			//printf("[[MoveConstructor]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			TFunc *o = reinterpret_cast<TFunc *>(other);
-			new (f) TFunc(move(*o));
+			new (f) TFunc(std::move(*o));
 		}), /*Destroy*/([](void *ptr) -> void {
 			//printf("[[Destroy]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
@@ -149,7 +149,7 @@ public:
 			//printf("[[MoveConstructor]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);
 			TFunc *o = reinterpret_cast<TFunc *>(other);
-			new (f) TFunc(move(*o));
+			new (f) TFunc(std::move(*o));
 		}), /*Destroy*/([](void *ptr) -> void {
 			//printf("[[Destroy]]\n");
 			TFunc *f = reinterpret_cast<TFunc *>(ptr);

@@ -169,7 +169,7 @@ public:
 		return el;
 	}
 
-	static SEV_FORCE_INLINE EventLoop *create(nothrow_t)
+	static SEV_FORCE_INLINE EventLoop *create(std::nothrow_t)
 	{
 		return (EventLoop *)SEV_EventLoop_create();
 	}

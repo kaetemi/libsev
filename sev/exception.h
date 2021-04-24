@@ -232,7 +232,7 @@ public:
 private:
 	void p_capture(std::exception_ptr ptr, const char *what, errno_t eno) noexcept
 	{
-		void *exception = new (nothrow) std::exception_ptr(ptr);
+		void *exception = new (std::nothrow) std::exception_ptr(ptr);
 		if (!exception) // Unable to allocate
 		{
 			eh = SEV_Exception_capture(eno); // Get a generic if possible
