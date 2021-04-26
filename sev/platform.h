@@ -72,8 +72,10 @@ static_assert(false, "C++17 is required");
 #endif
 
 // Define null, with color highlight
+#ifndef null
 constexpr decltype(nullptr) null = nullptr;
 #define null null
+#endif
 
 // Include STL string and allow string literals.
 // Always use sv suffix when declaring string literals.
